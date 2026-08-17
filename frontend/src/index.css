@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+* {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+/* Dark Mode Global Styles */
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+/* White backgrounds */
+
+.dark .bg-white {
+  background-color: #1e293b !important;
+}
+
+/* Slate backgrounds */
+
+.dark .bg-slate-100 {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+/* Text */
+
+.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+/* Borders */
+
+.dark .border {
+  border-color: #475569 !important;
+}
+
+.dark .border-b {
+  border-color: #475569 !important;
+}
+
+/* Inputs */
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #334155;
+  color: #f8fafc;
+  border-color: #475569;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Select options */
+
+.dark select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+/* Tables */
+
+.dark table {
+  background-color: #1e293b;
+}
+
+.dark thead {
+  background-color: #334155;
+}
+
+.dark th {
+  color: #f8fafc !important;
+}
+
+.dark td {
+  color: #e2e8f0 !important;
+}
+
+.dark tr {
+  border-color: #475569;
+}
+
+/* Hover */
+
+.dark .hover\:bg-slate-50:hover {
+  background-color: #334155 !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  background-color: #334155 !important;
+}
