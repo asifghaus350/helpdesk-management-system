@@ -1,23 +1,29 @@
-function DashboardCard({ title, count, icon: Icon, color }) {
+function DashboardCard({
+  title,
+  count,
+  icon: Icon,
+  color,
+  iconColor,
+}) {
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 flex items-center justify-between">
-      
-      {/* Card Content */}
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow duration-200">
 
+      {/* Card Content */}
       <div>
-        <p className="text-gray-500 dark:text-gray-300">
+        <p className="text-sm font-medium text-slate-500">
           {title}
         </p>
 
-        <h2 className="text-4xl font-bold mt-2 text-slate-800 dark:text-white">
+        <h2 className="text-4xl font-bold mt-2 text-slate-800">
           {count}
         </h2>
       </div>
 
       {/* Icon */}
-
-      <div className={`${color} p-4 rounded-xl text-white`}>
-        <Icon size={28} />
+      <div
+        className={`${color} ${iconColor} w-16 h-16 rounded-2xl flex items-center justify-center`}
+      >
+        <Icon size={30} strokeWidth={2} />
       </div>
 
     </div>

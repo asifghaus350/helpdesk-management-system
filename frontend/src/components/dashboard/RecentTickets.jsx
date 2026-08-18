@@ -8,75 +8,141 @@ function RecentTickets() {
     return [...storedTickets].reverse().slice(0, 5);
   });
 
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "Open":
+        return "bg-red-50 text-red-600";
+
+      case "In Progress":
+        return "bg-amber-50 text-amber-600";
+
+      case "Closed":
+        return "bg-emerald-50 text-emerald-600";
+
+      default:
+        return "bg-slate-100 text-slate-600";
+    }
+  };
+
+  const getPriorityStyle = (priority) => {
+    switch (priority) {
+      case "High":
+        return "text-red-600";
+
+      case "Medium":
+        return "text-amber-600";
+
+      case "Low":
+        return "text-emerald-600";
+
+      default:
+        return "text-slate-600";
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6">
-      {/* Heading */}
-
-      <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-6">
-        Recent Tickets
-      </h2>
-
-      {/* No Tickets */}
-
+    <>
       {tickets.length === 0 ? (
-        <p className="text-gray-500 dark:text-gray-400 text-center py-6">
-          No recent tickets found.
-        </p>
+        <div className="py-12 text-center">
+          <p className="text-sm text-slate-500">
+            No recent tickets found.
+          </p>
+
+          <p className="text-xs text-slate-400 mt-1">
+            Newly created tickets will appear here.
+          </p>
+        </div>
       ) : (
         <div className="overflow-x-auto">
+
           <table className="w-full">
+
             {/* Table Header */}
 
             <thead>
-              <tr className="border-b border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700">
-                <th className="text-left py-3 px-2 text-slate-800 dark:text-white">
+              <tr className="border-b border-slate-100">
+
+                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   ID
                 </th>
 
-                <th className="text-left px-2 text-slate-800 dark:text-white">
+                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Title
                 </th>
 
-                <th className="text-left px-2 text-slate-800 dark:text-white">
+                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Status
                 </th>
 
-                <th className="text-left px-2 text-slate-800 dark:text-white">
+                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Priority
                 </th>
+
               </tr>
             </thead>
 
             {/* Table Body */}
 
             <tbody>
+
               {tickets.map((ticket) => (
+
                 <tr
                   key={ticket.id}
-                  className="border-b border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition"
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
                 >
-                  <td className="py-4 px-2 text-slate-700 dark:text-gray-200">
-                    {ticket.id}
+
+                  {/* ID */}
+
+                  <td className="py-4 px-3 text-sm font-medium text-slate-700">
+                    #{ticket.id}
                   </td>
 
-                  <td className="px-2 text-slate-700 dark:text-gray-200">
-                    {ticket.title}
+                  {/* Title */}
+
+                  <td className="py-4 px-3">
+
+                    <p className="text-sm font-medium text-slate-800">
+                      {ticket.title}
+                    </p>
+
                   </td>
 
-                  <td className="px-2 text-slate-700 dark:text-gray-200">
-                    {ticket.status}
+                  {/* Status */}
+
+                  <td className="py-4 px-3">
+
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(
+                        ticket.status
+                      )}`}
+                    >
+                      {ticket.status}
+                    </span>
+
                   </td>
 
-                  <td className="px-2 text-slate-700 dark:text-gray-200">
+                  {/* Priority */}
+
+                  <td
+                    className={`py-4 px-3 text-sm font-medium ${getPriorityStyle(
+                      ticket.priority
+                    )}`}
+                  >
                     {ticket.priority}
                   </td>
+
                 </tr>
+
               ))}
+
             </tbody>
+
           </table>
+
         </div>
       )}
-    </div>
+    </>
   );
 }
 

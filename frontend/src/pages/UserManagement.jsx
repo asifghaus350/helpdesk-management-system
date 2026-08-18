@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   Search,
   UserPlus,
@@ -11,16 +12,22 @@ import Layout from "../components/layout/Layout";
 import { addNotification } from "../utils/notificationUtils";
 
 function UserManagement() {
+  // Search
   const [search, setSearch] = useState("");
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Filters
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
+  // Add / Edit modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
 
-  // Delete modal states
+  // Delete modal
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
 
+  // Form data
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -128,16 +135,16 @@ function UserManagement() {
 
       setUsers(updatedUsers);
 
-localStorage.setItem(
-  "users",
-  JSON.stringify(updatedUsers)
-);
+      localStorage.setItem(
+        "users",
+        JSON.stringify(updatedUsers)
+      );
 
-addNotification(
-  `User ${formData.name} was updated.`
-);
+      addNotification(
+        `User ${formData.name} was updated.`
+      );
 
-alert("User updated successfully!");
+      alert("User updated successfully!");
 
       setEditingUserId(null);
       setIsModalOpen(false);
@@ -162,18 +169,20 @@ alert("User updated successfully!");
     };
 
     const updatedUsers = [...users, newUser];
-setUsers(updatedUsers);
 
-localStorage.setItem(
-  "users",
-  JSON.stringify(updatedUsers)
-);
+    setUsers(updatedUsers);
 
-addNotification(
-  `User ${newUser.name} was added.`
-);
+    localStorage.setItem(
+      "users",
+      JSON.stringify(updatedUsers)
+    );
 
-alert("User added successfully!");
+    addNotification(
+      `User ${newUser.name} was added.`
+    );
+
+    alert("User added successfully!");
+
     setFormData({
       name: "",
       email: "",
@@ -192,39 +201,52 @@ alert("User added successfully!");
 
   // Delete User
   const handleDelete = () => {
-  const deletedUser = users.find(
-    (user) => user.id === selectedUserId
-  );
-
-  const updatedUsers = users.filter(
-    (user) => user.id !== selectedUserId
-  );
-
-  setUsers(updatedUsers);
-
-  localStorage.setItem(
-    "users",
-    JSON.stringify(updatedUsers)
-  );
-
-  if (deletedUser) {
-    addNotification(
-      `User ${deletedUser.name} was deleted.`
+    const deletedUser = users.find(
+      (user) => user.id === selectedUserId
     );
-  }
 
-  setIsDeleteOpen(false);
-  setSelectedUserId(null);
-};
+    const updatedUsers = users.filter(
+      (user) => user.id !== selectedUserId
+    );
 
-  // Search Users
+    setUsers(updatedUsers);
+
+    localStorage.setItem(
+      "users",
+      JSON.stringify(updatedUsers)
+    );
+
+    if (deletedUser) {
+      addNotification(
+        `User ${deletedUser.name} was deleted.`
+      );
+    }
+
+    setIsDeleteOpen(false);
+    setSelectedUserId(null);
+  };
+
+  // Search + Role + Status Filters
   const filteredUsers = users.filter((user) => {
     const searchText = search.toLowerCase();
 
-    return (
+    const matchesSearch =
       user.name.toLowerCase().includes(searchText) ||
       user.email.toLowerCase().includes(searchText) ||
-      user.role.toLowerCase().includes(searchText)
+      user.role.toLowerCase().includes(searchText);
+
+    const matchesRole =
+      roleFilter === "" ||
+      user.role === roleFilter;
+
+    const matchesStatus =
+      statusFilter === "" ||
+      user.status === statusFilter;
+
+    return (
+      matchesSearch &&
+      matchesRole &&
+      matchesStatus
     );
   });
 
@@ -236,6 +258,7 @@ alert("User added successfully!");
       <div className="flex justify-between items-start mb-8">
 
         <div>
+
           <h1 className="text-3xl font-bold text-slate-800">
             User Management
           </h1>
@@ -243,6 +266,7 @@ alert("User added successfully!");
           <p className="text-gray-500 mt-2">
             Manage users, roles and account status.
           </p>
+
         </div>
 
         {/* Add User */}
@@ -252,29 +276,86 @@ alert("User added successfully!");
           className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-semibold transition"
         >
           <UserPlus size={18} />
+
           Add User
         </button>
 
       </div>
 
-      {/* Search */}
+      {/* Search & Filters */}
 
       <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
 
-        <div className="relative max-w-xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-          <Search
-            size={18}
-            className="absolute left-3 top-3.5 text-gray-400"
-          />
+          {/* Search */}
 
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="relative">
+
+            <Search
+              size={18}
+              className="absolute left-3 top-3.5 text-gray-400"
+            />
+
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              className="w-full border rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+          </div>
+
+          {/* Role Filter */}
+
+          <select
+            value={roleFilter}
+            onChange={(e) =>
+              setRoleFilter(e.target.value)
+            }
+            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">
+              All Roles
+            </option>
+
+            <option value="User">
+              User
+            </option>
+
+            <option value="Engineer">
+              Engineer
+            </option>
+
+            <option value="Admin">
+              Admin
+            </option>
+          </select>
+
+          {/* Status Filter */}
+
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">
+              All Status
+            </option>
+
+            <option value="Active">
+              Active
+            </option>
+
+            <option value="Inactive">
+              Inactive
+            </option>
+          </select>
 
         </div>
 

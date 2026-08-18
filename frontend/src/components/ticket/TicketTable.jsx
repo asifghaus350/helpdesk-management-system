@@ -1,17 +1,27 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import {
+  Eye,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+
 import DeleteModal from "../ui/DeleteModal";
 
-function TicketTable({ search, status, priority, category }) {
+function TicketTable({
+  search,
+  status,
+  priority,
+  category,
+}) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const ticketsPerPage = 2;
+  const ticketsPerPage = 5;
 
-  // Default tickets - only used when localStorage has never been initialized
+  // Default tickets
   const defaultTickets = [
     {
       id: "TKT-1001",
@@ -135,195 +145,338 @@ function TicketTable({ search, status, priority, category }) {
     indexOfLastTicket
   );
 
+  // Status styling
+  const getStatusStyle = (ticketStatus) => {
+    switch (ticketStatus) {
+      case "Open":
+        return "bg-blue-50 text-blue-600";
+
+      case "In Progress":
+        return "bg-amber-50 text-amber-600";
+
+      case "Closed":
+        return "bg-emerald-50 text-emerald-600";
+
+      default:
+        return "bg-slate-100 text-slate-600";
+    }
+  };
+
+  // Priority styling
+  const getPriorityStyle = (ticketPriority) => {
+    switch (ticketPriority) {
+      case "High":
+        return "bg-red-50 text-red-600";
+
+      case "Medium":
+        return "bg-amber-50 text-amber-600";
+
+      case "Low":
+        return "bg-emerald-50 text-emerald-600";
+
+      default:
+        return "bg-slate-100 text-slate-600";
+    }
+  };
+
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+      {/* Ticket Table Card */}
+
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
 
         {/* Table */}
-        <table className="w-full">
 
-          <thead className="bg-slate-100">
-            <tr>
-              <th className="text-left p-4">
-                Ticket ID
-              </th>
+        <div className="overflow-x-auto">
 
-              <th className="text-left p-4">
-                Title
-              </th>
+          <table className="w-full">
 
-              <th className="text-left p-4">
-                Category
-              </th>
+            {/* Table Header */}
 
-              <th className="text-left p-4">
-                Priority
-              </th>
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
 
-              <th className="text-left p-4">
-                Status
-              </th>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Ticket ID
+                </th>
 
-              <th className="text-left p-4">
-                Engineer
-              </th>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Title
+                </th>
 
-              <th className="text-center p-4">
-                Actions
-              </th>
-            </tr>
-          </thead>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Category
+                </th>
 
-          <tbody>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Priority
+                </th>
 
-            {currentTickets.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="7"
-                  className="text-center py-10 text-gray-500"
-                >
-                  No tickets found.
-                </td>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Status
+                </th>
+
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Engineer
+                </th>
+
+                <th className="text-center px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Actions
+                </th>
+
               </tr>
-            ) : (
-              currentTickets.map((ticket) => (
-                <tr
-                  key={ticket.id}
-                  className="border-t hover:bg-slate-50 transition"
-                >
+            </thead>
 
-                  {/* Ticket ID */}
-                  <td className="p-4 font-medium">
-                    {ticket.id}
-                  </td>
+            {/* Table Body */}
 
-                  {/* Title */}
-                  <td className="p-4">
-                    {ticket.title}
-                  </td>
+            <tbody>
 
-                  {/* Category */}
-                  <td className="p-4">
-                    {ticket.category}
-                  </td>
+              {currentTickets.length === 0 ? (
 
-                  {/* Priority */}
-                  <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        ticket.priority === "High"
-                          ? "bg-red-100 text-red-600"
-                          : ticket.priority === "Medium"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-600"
-                      }`}
-                    >
-                      {ticket.priority}
-                    </span>
-                  </td>
+                <tr>
+                  <td
+                    colSpan="7"
+                    className="py-14 text-center"
+                  >
+                    <div className="flex flex-col items-center">
 
-                  {/* Status */}
-                  <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        ticket.status === "Open"
-                          ? "bg-blue-100 text-blue-700"
-                          : ticket.status === "In Progress"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {ticket.status}
-                    </span>
-                  </td>
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
+                        <Eye
+                          size={22}
+                          className="text-slate-400"
+                        />
+                      </div>
 
-                  {/* Engineer */}
-                  <td className="p-4">
-                    {ticket.engineer}
-                  </td>
+                      <p className="text-sm font-medium text-slate-700">
+                        No tickets found
+                      </p>
 
-                  {/* Actions */}
-                  <td className="p-4">
-                    <div className="flex justify-center gap-4">
-
-                      {/* View */}
-                      <Link
-                        to={`/tickets/${ticket.id}`}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="View Ticket"
-                      >
-                        <Eye size={18} />
-                      </Link>
-
-                      {/* Edit */}
-                      <Link
-                        to={`/tickets/edit/${ticket.id}`}
-                        className="text-green-600 hover:text-green-800"
-                        title="Edit Ticket"
-                      >
-                        <Pencil size={18} />
-                      </Link>
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => {
-                          setSelectedTicket(ticket.id);
-                          setIsDeleteOpen(true);
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete Ticket"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Try changing your search or filters.
+                      </p>
 
                     </div>
                   </td>
-
                 </tr>
-              ))
-            )}
 
-          </tbody>
-        </table>
+              ) : (
+
+                currentTickets.map((ticket) => (
+
+                  <tr
+                    key={ticket.id}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                  >
+
+                    {/* Ticket ID */}
+
+                    <td className="px-6 py-5">
+
+                      <span className="text-sm font-semibold text-blue-600">
+                        {ticket.id}
+                      </span>
+
+                    </td>
+
+                    {/* Title */}
+
+                    <td className="px-6 py-5">
+
+                      <p className="text-sm font-medium text-slate-800">
+                        {ticket.title}
+                      </p>
+
+                      <p className="text-xs text-slate-400 mt-1 max-w-xs truncate">
+                        {ticket.description}
+                      </p>
+
+                    </td>
+
+                    {/* Category */}
+
+                    <td className="px-6 py-5">
+
+                      <span className="text-sm text-slate-600">
+                        {ticket.category}
+                      </span>
+
+                    </td>
+
+                    {/* Priority */}
+
+                    <td className="px-6 py-5">
+
+                      <span
+                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(
+                          ticket.priority
+                        )}`}
+                      >
+                        {ticket.priority}
+                      </span>
+
+                    </td>
+
+                    {/* Status */}
+
+                    <td className="px-6 py-5">
+
+                      <span
+                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(
+                          ticket.status
+                        )}`}
+                      >
+                        {ticket.status}
+                      </span>
+
+                    </td>
+
+                    {/* Engineer */}
+
+                    <td className="px-6 py-5">
+
+                      <div className="flex items-center gap-2">
+
+                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-semibold">
+                          {ticket.engineer
+                            ? ticket.engineer
+                                .charAt(0)
+                                .toUpperCase()
+                            : "?"}
+                        </div>
+
+                        <span className="text-sm text-slate-600">
+                          {ticket.engineer}
+                        </span>
+
+                      </div>
+
+                    </td>
+
+                    {/* Actions */}
+
+                    <td className="px-6 py-5">
+
+                      <div className="flex justify-center items-center gap-2">
+
+                        {/* View */}
+
+                        <Link
+                          to={`/tickets/${ticket.id}`}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-blue-600 hover:bg-blue-50 transition"
+                          title="View Ticket"
+                        >
+                          <Eye size={18} />
+                        </Link>
+
+                        {/* Edit */}
+
+                        <Link
+                          to={`/tickets/edit/${ticket.id}`}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition"
+                          title="Edit Ticket"
+                        >
+                          <Pencil size={18} />
+                        </Link>
+
+                        {/* Delete */}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTicket(ticket.id);
+                            setIsDeleteOpen(true);
+                          }}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-50 transition"
+                          title="Delete Ticket"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+
+                      </div>
+
+                    </td>
+
+                  </tr>
+
+                ))
+
+              )}
+
+            </tbody>
+
+          </table>
+
+        </div>
 
         {/* Pagination */}
+
         {filteredTickets.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t">
 
-            <button
-              onClick={() =>
-                setCurrentPage((prev) =>
-                  Math.max(prev - 1, 1)
-                )
-              }
-              disabled={safeCurrentPage === 1}
-              className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-            >
-              Previous
-            </button>
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200">
 
-            <span className="text-sm font-medium">
-              Page {safeCurrentPage} of {totalPages}
-            </span>
+            <p className="text-sm text-slate-500">
+              Showing{" "}
+              <span className="font-medium text-slate-700">
+                {indexOfFirstTicket + 1}
+              </span>
+              {" "}to{" "}
+              <span className="font-medium text-slate-700">
+                {Math.min(
+                  indexOfLastTicket,
+                  filteredTickets.length
+                )}
+              </span>
+              {" "}of{" "}
+              <span className="font-medium text-slate-700">
+                {filteredTickets.length}
+              </span>
+              {" "}tickets
+            </p>
 
-            <button
-              onClick={() =>
-                setCurrentPage((prev) =>
-                  Math.min(prev + 1, totalPages)
-                )
-              }
-              disabled={safeCurrentPage === totalPages}
-              className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-            >
-              Next
-            </button>
+            <div className="flex items-center gap-2">
+
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentPage((prev) =>
+                    Math.max(prev - 1, 1)
+                  )
+                }
+                disabled={safeCurrentPage === 1}
+                className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Previous
+              </button>
+
+              <div className="px-3 py-2 text-sm font-medium text-slate-700 bg-slate-50 rounded-lg">
+                {safeCurrentPage} / {totalPages}
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentPage((prev) =>
+                    Math.min(prev + 1, totalPages)
+                  )
+                }
+                disabled={
+                  safeCurrentPage === totalPages
+                }
+                className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Next
+              </button>
+
+            </div>
 
           </div>
+
         )}
 
       </div>
 
       {/* Delete Modal */}
+
       <DeleteModal
         isOpen={isDeleteOpen}
         onClose={() => {
