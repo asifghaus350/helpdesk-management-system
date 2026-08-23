@@ -1,29 +1,92 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 
 function TicketDetails() {
   const { id } = useParams();
 
-  // Get tickets from localStorage
-  const tickets =
-    JSON.parse(localStorage.getItem("tickets")) || [];
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Find selected ticket
-  const ticket = tickets.find(
-    (item) => item.id === id
-  );
+  // =========================
+  // FETCH TICKET
+  // =========================
 
-  // Ticket not found
-  if (!ticket) {
+  useEffect(() => {
+    const fetchTicket = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          setError("Authentication required. Please login.");
+          return;
+        }
+
+        const response = await fetch(
+          `http://localhost:5000/api/tickets/${id}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to fetch ticket"
+          );
+        }
+
+        setTicket(data.ticket);
+      } catch (error) {
+        console.error("Fetch ticket error:", error);
+
+        setError(
+          error.message || "Unable to load ticket."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTicket();
+  }, [id]);
+
+  // =========================
+  // LOADING
+  // =========================
+
+  if (loading) {
     return (
       <Layout>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-10 text-center text-gray-500 dark:text-slate-400">
+          Loading ticket...
+        </div>
+      </Layout>
+    );
+  }
 
+  // =========================
+  // ERROR / NOT FOUND
+  // =========================
+
+  if (error || !ticket) {
+    return (
+      <Layout>
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
           Ticket Not Found
         </h1>
 
         <p className="text-gray-500 dark:text-slate-400 mt-2">
-          The ticket you are looking for does not exist.
+          {error ||
+            "The ticket you are looking for does not exist."}
         </p>
 
         <Link
@@ -32,7 +95,6 @@ function TicketDetails() {
         >
           Back to Tickets
         </Link>
-
       </Layout>
     );
   }
@@ -57,7 +119,7 @@ function TicketDetails() {
         </div>
 
         <Link
-          to={`/tickets/edit/${ticket.id}`}
+          to={`/tickets/edit/${ticket.ticketId}`}
           className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700"
         >
           Edit Ticket
@@ -80,7 +142,7 @@ function TicketDetails() {
             </p>
 
             <h3 className="font-semibold text-slate-800 dark:text-white mt-1">
-              {ticket.id}
+              {ticket.ticketId}
             </h3>
 
           </div>
@@ -122,7 +184,7 @@ function TicketDetails() {
             </p>
 
             <h3 className="text-slate-800 dark:text-white mt-1">
-              {ticket.engineer}
+              {ticket.engineer || "Unassigned"}
             </h3>
 
           </div>
@@ -194,7 +256,11 @@ function TicketDetails() {
             </p>
 
             <h3 className="text-slate-800 dark:text-white mt-1">
-              {ticket.createdAt || "Not available"}
+              {ticket.createdAt
+                ? new Date(
+                    ticket.createdAt
+                  ).toLocaleString()
+                : "Not available"}
             </h3>
 
           </div>
@@ -213,7 +279,7 @@ function TicketDetails() {
           </Link>
 
           <Link
-            to={`/tickets/edit/${ticket.id}`}
+            to={`/tickets/edit/${ticket.ticketId}`}
             className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700"
           >
             Edit Ticket

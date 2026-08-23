@@ -1,11 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Eye,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import DeleteModal from "../ui/DeleteModal";
 
 function TicketTable({
@@ -17,116 +12,189 @@ function TicketTable({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [currentPage, setCurrentPage] = useState(1);
 
-  const ticketsPerPage = 5;
+  const ticketsPerPage = 2;
 
-  // Default tickets
-  const defaultTickets = [
-    {
-      id: "TKT-1001",
-      title: "Login Issue",
-      description: "User unable to login into portal.",
-      category: "Bug",
-      priority: "High",
-      status: "Open",
-      engineer: "Rahul Sharma",
-    },
-    {
-      id: "TKT-1002",
-      title: "Payment Failed",
-      description: "Payment gateway timeout.",
-      category: "Support",
-      priority: "Medium",
-      status: "In Progress",
-      engineer: "Aman Khan",
-    },
-    {
-      id: "TKT-1003",
-      title: "Email Not Working",
-      description: "Email notification feature request.",
-      category: "Feature Request",
-      priority: "Low",
-      status: "Closed",
-      engineer: "Priya Singh",
-    },
-  ];
+  // =========================
+  // FETCH TICKETS
+  // =========================
 
-  // Load tickets from localStorage
-  const [tickets, setTickets] = useState(() => {
-    const savedTickets = localStorage.getItem("tickets");
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    if (savedTickets !== null) {
-      return JSON.parse(savedTickets);
-    }
+      const token = localStorage.getItem("token");
 
-    localStorage.setItem(
-      "tickets",
-      JSON.stringify(defaultTickets)
-    );
+      if (!token) {
+        setError("Authentication required. Please login.");
+        return;
+      }
 
-    return defaultTickets;
-  });
+      const response = await fetch(
+        "http://localhost:5000/api/tickets",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-  // Delete ticket
-  const handleDelete = () => {
-    const updatedTickets = tickets.filter(
-      (ticket) => ticket.id !== selectedTicket
-    );
+      const data = await response.json();
 
-    setTickets(updatedTickets);
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to fetch tickets"
+        );
+      }
 
-    localStorage.setItem(
-      "tickets",
-      JSON.stringify(updatedTickets)
-    );
+      setTickets(data.tickets || []);
+    } catch (error) {
+      console.error("Fetch tickets error:", error);
 
-    setIsDeleteOpen(false);
-    setSelectedTicket(null);
-
-    const totalPages = Math.ceil(
-      updatedTickets.length / ticketsPerPage
-    );
-
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-
-    if (updatedTickets.length === 0) {
-      setCurrentPage(1);
+      setError(
+        error.message ||
+          "Unable to load tickets."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Search + Filters
-  const filteredTickets = tickets.filter((ticket) => {
-    const searchText = search.toLowerCase();
+ useEffect(() => {
+  const loadTickets = async () => {
+    await fetchTickets();
+  };
 
-    const matchesSearch =
-      ticket.id.toLowerCase().includes(searchText) ||
-      ticket.title.toLowerCase().includes(searchText) ||
-      ticket.description.toLowerCase().includes(searchText) ||
-      ticket.engineer.toLowerCase().includes(searchText);
+  loadTickets();
+}, []);
 
-    const matchesStatus =
-      status === "" || ticket.status === status;
+  // =========================
+  // DELETE TICKET
+  // =========================
 
-    const matchesPriority =
-      priority === "" || ticket.priority === priority;
+  const handleDelete = async () => {
+    try {
+      const token = localStorage.getItem("token");
 
-    const matchesCategory =
-      category === "" || ticket.category === category;
+      if (!token) {
+        setError(
+          "Authentication required. Please login."
+        );
+        return;
+      }
 
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPriority &&
-      matchesCategory
-    );
-  });
+      const response = await fetch(
+        `http://localhost:5000/api/tickets/${selectedTicket}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-  // Pagination
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to delete ticket"
+        );
+      }
+
+      // Remove deleted ticket from UI
+      const updatedTickets = tickets.filter(
+        (ticket) =>
+          ticket.ticketId !== selectedTicket
+      );
+
+      setTickets(updatedTickets);
+
+      setIsDeleteOpen(false);
+      setSelectedTicket(null);
+
+      // Fix pagination after deletion
+      const totalPages = Math.ceil(
+        updatedTickets.length / ticketsPerPage
+      );
+
+      if (
+        currentPage > totalPages &&
+        totalPages > 0
+      ) {
+        setCurrentPage(totalPages);
+      }
+
+      if (updatedTickets.length === 0) {
+        setCurrentPage(1);
+      }
+    } catch (error) {
+      console.error("Delete ticket error:", error);
+
+      setError(
+        error.message ||
+          "Unable to delete ticket."
+      );
+    }
+  };
+
+  // =========================
+  // SEARCH + FILTER
+  // =========================
+
+  const filteredTickets = tickets.filter(
+    (ticket) => {
+      const searchText =
+        search.toLowerCase();
+
+      const matchesSearch =
+        ticket.ticketId
+          ?.toLowerCase()
+          .includes(searchText) ||
+        ticket.title
+          ?.toLowerCase()
+          .includes(searchText) ||
+        ticket.description
+          ?.toLowerCase()
+          .includes(searchText) ||
+        ticket.engineer
+          ?.toLowerCase()
+          .includes(searchText);
+
+      const matchesStatus =
+        status === "" ||
+        ticket.status === status;
+
+      const matchesPriority =
+        priority === "" ||
+        ticket.priority === priority;
+
+      const matchesCategory =
+        category === "" ||
+        ticket.category === category;
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesPriority &&
+        matchesCategory
+      );
+    }
+  );
+
+  // =========================
+  // PAGINATION
+  // =========================
+
   const totalPages = Math.ceil(
-    filteredTickets.length / ticketsPerPage
+    filteredTickets.length /
+      ticketsPerPage
   );
 
   const safeCurrentPage =
@@ -138,178 +206,141 @@ function TicketTable({
     safeCurrentPage * ticketsPerPage;
 
   const indexOfFirstTicket =
-    indexOfLastTicket - ticketsPerPage;
+    indexOfLastTicket -
+    ticketsPerPage;
 
-  const currentTickets = filteredTickets.slice(
-    indexOfFirstTicket,
-    indexOfLastTicket
-  );
+  const currentTickets =
+    filteredTickets.slice(
+      indexOfFirstTicket,
+      indexOfLastTicket
+    );
 
-  // Status styling
-  const getStatusStyle = (ticketStatus) => {
-    switch (ticketStatus) {
-      case "Open":
-        return "bg-blue-50 text-blue-600";
+  // =========================
+  // RESET PAGE WHEN FILTER CHANGES
+  // =========================
 
-      case "In Progress":
-        return "bg-amber-50 text-amber-600";
 
-      case "Closed":
-        return "bg-emerald-50 text-emerald-600";
+  // =========================
+  // LOADING
+  // =========================
 
-      default:
-        return "bg-slate-100 text-slate-600";
-    }
-  };
-
-  // Priority styling
-  const getPriorityStyle = (ticketPriority) => {
-    switch (ticketPriority) {
-      case "High":
-        return "bg-red-50 text-red-600";
-
-      case "Medium":
-        return "bg-amber-50 text-amber-600";
-
-      case "Low":
-        return "bg-emerald-50 text-emerald-600";
-
-      default:
-        return "bg-slate-100 text-slate-600";
-    }
-  };
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-md p-10 text-center text-gray-500">
+        Loading tickets...
+      </div>
+    );
+  }
 
   return (
     <>
-      {/* Ticket Table Card */}
+      {/* Error Message */}
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
 
         {/* Table */}
 
-        <div className="overflow-x-auto">
+        <table className="w-full">
 
-          <table className="w-full">
+          <thead className="bg-slate-100">
 
-            {/* Table Header */}
+            <tr>
 
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="text-left p-4">
+                Ticket ID
+              </th>
 
-                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Ticket ID
-                </th>
+              <th className="text-left p-4">
+                Title
+              </th>
 
-                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Title
-                </th>
+              <th className="text-left p-4">
+                Category
+              </th>
 
-                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Category
-                </th>
+              <th className="text-left p-4">
+                Priority
+              </th>
 
-                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Priority
-                </th>
+              <th className="text-left p-4">
+                Status
+              </th>
 
-                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
-                </th>
+              <th className="text-left p-4">
+                Engineer
+              </th>
 
-                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Engineer
-                </th>
+              <th className="text-center p-4">
+                Actions
+              </th>
 
-                <th className="text-center px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Actions
-                </th>
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {currentTickets.length === 0 ? (
+
+              <tr>
+
+                <td
+                  colSpan="7"
+                  className="text-center py-10 text-gray-500"
+                >
+                  No tickets found.
+                </td>
 
               </tr>
-            </thead>
 
-            {/* Table Body */}
+            ) : (
 
-            <tbody>
-
-              {currentTickets.length === 0 ? (
-
-                <tr>
-                  <td
-                    colSpan="7"
-                    className="py-14 text-center"
-                  >
-                    <div className="flex flex-col items-center">
-
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
-                        <Eye
-                          size={22}
-                          className="text-slate-400"
-                        />
-                      </div>
-
-                      <p className="text-sm font-medium text-slate-700">
-                        No tickets found
-                      </p>
-
-                      <p className="text-xs text-slate-400 mt-1">
-                        Try changing your search or filters.
-                      </p>
-
-                    </div>
-                  </td>
-                </tr>
-
-              ) : (
-
-                currentTickets.map((ticket) => (
+              currentTickets.map(
+                (ticket) => (
 
                   <tr
-                    key={ticket.id}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                    key={ticket.ticketId}
+                    className="border-t hover:bg-slate-50 transition"
                   >
 
                     {/* Ticket ID */}
 
-                    <td className="px-6 py-5">
-
-                      <span className="text-sm font-semibold text-blue-600">
-                        {ticket.id}
-                      </span>
-
+                    <td className="p-4 font-medium">
+                      {ticket.ticketId}
                     </td>
 
                     {/* Title */}
 
-                    <td className="px-6 py-5">
-
-                      <p className="text-sm font-medium text-slate-800">
-                        {ticket.title}
-                      </p>
-
-                      <p className="text-xs text-slate-400 mt-1 max-w-xs truncate">
-                        {ticket.description}
-                      </p>
-
+                    <td className="p-4">
+                      {ticket.title}
                     </td>
 
                     {/* Category */}
 
-                    <td className="px-6 py-5">
-
-                      <span className="text-sm text-slate-600">
-                        {ticket.category}
-                      </span>
-
+                    <td className="p-4">
+                      {ticket.category}
                     </td>
 
                     {/* Priority */}
 
-                    <td className="px-6 py-5">
+                    <td className="p-4">
 
                       <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(
-                          ticket.priority
-                        )}`}
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          ticket.priority ===
+                          "High"
+                            ? "bg-red-100 text-red-600"
+                            : ticket.priority ===
+                              "Medium"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-600"
+                        }`}
                       >
                         {ticket.priority}
                       </span>
@@ -318,12 +349,18 @@ function TicketTable({
 
                     {/* Status */}
 
-                    <td className="px-6 py-5">
+                    <td className="p-4">
 
                       <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(
-                          ticket.status
-                        )}`}
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          ticket.status ===
+                          "Open"
+                            ? "bg-blue-100 text-blue-700"
+                            : ticket.status ===
+                              "In Progress"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
                       >
                         {ticket.status}
                       </span>
@@ -332,37 +369,22 @@ function TicketTable({
 
                     {/* Engineer */}
 
-                    <td className="px-6 py-5">
-
-                      <div className="flex items-center gap-2">
-
-                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-semibold">
-                          {ticket.engineer
-                            ? ticket.engineer
-                                .charAt(0)
-                                .toUpperCase()
-                            : "?"}
-                        </div>
-
-                        <span className="text-sm text-slate-600">
-                          {ticket.engineer}
-                        </span>
-
-                      </div>
-
+                    <td className="p-4">
+                      {ticket.engineer ||
+                        "Unassigned"}
                     </td>
 
                     {/* Actions */}
 
-                    <td className="px-6 py-5">
+                    <td className="p-4">
 
-                      <div className="flex justify-center items-center gap-2">
+                      <div className="flex justify-center gap-4">
 
                         {/* View */}
 
                         <Link
-                          to={`/tickets/${ticket.id}`}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center text-blue-600 hover:bg-blue-50 transition"
+                          to={`/tickets/${ticket.ticketId}`}
+                          className="text-blue-600 hover:text-blue-800"
                           title="View Ticket"
                         >
                           <Eye size={18} />
@@ -371,8 +393,8 @@ function TicketTable({
                         {/* Edit */}
 
                         <Link
-                          to={`/tickets/edit/${ticket.id}`}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition"
+                          to={`/tickets/edit/${ticket.ticketId}`}
+                          className="text-green-600 hover:text-green-800"
                           title="Edit Ticket"
                         >
                           <Pencil size={18} />
@@ -381,12 +403,14 @@ function TicketTable({
                         {/* Delete */}
 
                         <button
-                          type="button"
                           onClick={() => {
-                            setSelectedTicket(ticket.id);
+                            setSelectedTicket(
+                              ticket.ticketId
+                            );
+
                             setIsDeleteOpen(true);
                           }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-50 transition"
+                          className="text-red-600 hover:text-red-800"
                           title="Delete Ticket"
                         >
                           <Trash2 size={18} />
@@ -398,76 +422,62 @@ function TicketTable({
 
                   </tr>
 
-                ))
+                )
+              )
 
-              )}
+            )}
 
-            </tbody>
+          </tbody>
 
-          </table>
-
-        </div>
+        </table>
 
         {/* Pagination */}
 
         {filteredTickets.length > 0 && (
 
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200">
+          <div className="flex items-center justify-between px-6 py-4 border-t">
 
-            <p className="text-sm text-slate-500">
-              Showing{" "}
-              <span className="font-medium text-slate-700">
-                {indexOfFirstTicket + 1}
-              </span>
-              {" "}to{" "}
-              <span className="font-medium text-slate-700">
-                {Math.min(
-                  indexOfLastTicket,
-                  filteredTickets.length
-                )}
-              </span>
-              {" "}of{" "}
-              <span className="font-medium text-slate-700">
-                {filteredTickets.length}
-              </span>
-              {" "}tickets
-            </p>
+            <button
+              onClick={() =>
+                setCurrentPage(
+                  (prev) =>
+                    Math.max(
+                      prev - 1,
+                      1
+                    )
+                )
+              }
+              disabled={
+                safeCurrentPage === 1
+              }
+              className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            >
+              Previous
+            </button>
 
-            <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              Page {safeCurrentPage} of{" "}
+              {totalPages}
+            </span>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setCurrentPage((prev) =>
-                    Math.max(prev - 1, 1)
-                  )
-                }
-                disabled={safeCurrentPage === 1}
-                className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                Previous
-              </button>
-
-              <div className="px-3 py-2 text-sm font-medium text-slate-700 bg-slate-50 rounded-lg">
-                {safeCurrentPage} / {totalPages}
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setCurrentPage((prev) =>
-                    Math.min(prev + 1, totalPages)
-                  )
-                }
-                disabled={
-                  safeCurrentPage === totalPages
-                }
-                className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                Next
-              </button>
-
-            </div>
+            <button
+              onClick={() =>
+                setCurrentPage(
+                  (prev) =>
+                    Math.min(
+                      prev + 1,
+                      totalPages
+                    )
+                )
+              }
+              disabled={
+                safeCurrentPage ===
+                totalPages
+              }
+              className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            >
+              Next
+            </button>
 
           </div>
 
@@ -485,6 +495,7 @@ function TicketTable({
         }}
         onDelete={handleDelete}
       />
+
     </>
   );
 }

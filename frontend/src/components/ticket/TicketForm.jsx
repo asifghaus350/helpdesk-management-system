@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { addNotification } from "../../utils/notificationUtils";
 
@@ -6,48 +6,104 @@ function TicketForm({ mode = "create" }) {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // Get engineers from User Management
-  const engineers = (() => {
-    const savedUsers =
-      JSON.parse(localStorage.getItem("users")) || [];
-return savedUsers.filter(
-  (user) =>
-    user.role === "Engineer" &&
-    user.status === "Active"
+  
+
+  const [formData, setFormData] = useState({
+    title: "",
+    category: "",
+    priority: "",
+    status: "Open",
+    engineer: "",
+    description: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [loadingTicket, setLoadingTicket] = useState(
+  mode === "edit" && Boolean(id)
 );
-  })();
+  const [error, setError] = useState("");
 
-  // Load existing ticket when Edit mode is active
-  const [formData, setFormData] = useState(() => {
-    if (mode === "edit" && id) {
-      const existingTickets =
-        JSON.parse(localStorage.getItem("tickets")) || [];
+  // =========================
+  // FETCH ENGINEERS
+  // =========================
 
-      const existingTicket = existingTickets.find(
-        (ticket) => ticket.id === id
-      );
+ const engineers =
+  JSON.parse(localStorage.getItem("users"))?.filter(
+    (user) =>
+      user.role === "Engineer" &&
+      user.status === "Active"
+  ) || [];
+  // =========================
+  // FETCH TICKET FOR EDIT
+  // =========================
 
-      if (existingTicket) {
-        return {
-          title: existingTicket.title || "",
-          category: existingTicket.category || "",
-          priority: existingTicket.priority || "",
-          status: existingTicket.status || "Open",
-          engineer: existingTicket.engineer || "",
-          description: existingTicket.description || "",
-        };
-      }
+  useEffect(() => {
+    if (mode !== "edit" || !id) {
+     
+      return;
     }
 
-    return {
-      title: "",
-      category: "",
-      priority: "",
-      status: "Open",
-      engineer: "",
-      description: "",
+    const fetchTicket = async () => {
+      try {
+        setLoadingTicket(true);
+        setError("");
+
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        const response = await fetch(
+          `http://localhost:5000/api/tickets/${id}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to fetch ticket"
+          );
+        }
+
+        const ticket = data.ticket;
+
+        setFormData({
+          title: ticket.title || "",
+          category: ticket.category || "",
+          priority: ticket.priority || "",
+          status: ticket.status || "Open",
+          engineer: ticket.engineer || "",
+          description: ticket.description || "",
+        });
+      } catch (error) {
+        console.error(
+          "Fetch ticket error:",
+          error
+        );
+
+        setError(
+          error.message ||
+            "Unable to load ticket."
+        );
+      } finally {
+        setLoadingTicket(false);
+      }
     };
-  });
+
+    fetchTicket();
+  }, [mode, id, navigate]);
+
+  // =========================
+  // HANDLE INPUT CHANGE
+  // =========================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -58,8 +114,14 @@ return savedUsers.filter(
     }));
   };
 
-  const handleSubmit = (e) => {
+  // =========================
+  // HANDLE SUBMIT
+  // =========================
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    setError("");
 
     // Validation
     if (
@@ -69,76 +131,146 @@ return savedUsers.filter(
       !formData.engineer ||
       !formData.description
     ) {
-      alert("Please fill all required fields.");
+      setError(
+        "Please fill all required fields."
+      );
       return;
     }
 
-    const existingTickets =
-      JSON.parse(localStorage.getItem("tickets")) || [];
+    try {
+      setLoading(true);
 
-    // EDIT
-    if (mode === "edit") {
-      const ticketExists = existingTickets.some(
-        (ticket) => ticket.id === id
-      );
+      const token = localStorage.getItem("token");
 
-      if (!ticketExists) {
-        alert("Ticket not found.");
+      if (!token) {
+        navigate("/login");
         return;
       }
 
-      const updatedTickets = existingTickets.map((ticket) =>
-        ticket.id === id
-          ? {
-              ...ticket,
-              ...formData,
-            }
-          : ticket
+      // =========================
+      // CREATE
+      // =========================
+
+      if (mode === "create") {
+        const response = await fetch(
+          "http://localhost:5000/api/tickets",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              title: formData.title,
+              description: formData.description,
+              category: formData.category,
+              priority: formData.priority,
+              status: formData.status,
+              engineer: formData.engineer,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Failed to create ticket"
+          );
+        }
+
+        addNotification(
+          `New ticket ${data.ticket.ticketId} has been created.`
+        );
+
+        alert("Ticket created successfully!");
+
+        navigate("/tickets");
+
+        return;
+      }
+
+      // =========================
+      // UPDATE
+      // =========================
+
+      if (mode === "edit") {
+        const response = await fetch(
+          `http://localhost:5000/api/tickets/${id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              title: formData.title,
+              description: formData.description,
+              category: formData.category,
+              priority: formData.priority,
+              status: formData.status,
+              engineer: formData.engineer,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Failed to update ticket"
+          );
+        }
+
+        addNotification(
+          `Ticket ${id} has been updated.`
+        );
+
+        alert("Ticket updated successfully!");
+
+        navigate("/tickets");
+      }
+    } catch (error) {
+      console.error(
+        "Ticket submit error:",
+        error
       );
 
-     localStorage.setItem(
-  "tickets",
-  JSON.stringify(updatedTickets)
-);
-
-addNotification(
-  `Ticket ${id} has been updated.`
-);
-
-alert("Ticket updated successfully!");
-
-navigate("/tickets");
-      return;
+      setError(
+        error.message ||
+          "Something went wrong. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    // CREATE
-    const newTicket = {
-      id: `TKT-${1001 + existingTickets.length}`,
-      ...formData,
-    };
-
-    const updatedTickets = [
-      ...existingTickets,
-      newTicket,
-    ];
-
-    localStorage.setItem(
-  "tickets",
-  JSON.stringify(updatedTickets)
-);
-
-addNotification(
-  `New ticket ${newTicket.id} has been created.`
-);
-
-alert("Ticket created successfully!");
-
-navigate("/tickets");
   };
+
+  // =========================
+  // LOADING EDIT TICKET
+  // =========================
+
+  if (loadingTicket) {
+    return (
+      <div className="bg-white rounded-2xl shadow-md p-10 text-center text-gray-500">
+        Loading ticket...
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit}>
+
       <div className="bg-white rounded-2xl shadow-md p-8">
+
+        {/* Error */}
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
 
         {/* Form Grid */}
 
@@ -253,6 +385,7 @@ navigate("/tickets");
           {/* Engineer */}
 
           <div className="md:col-span-2">
+
             <label className="block font-medium mb-2">
               Assign Engineer *
             </label>
@@ -283,11 +416,13 @@ navigate("/tickets");
                 from User Management.
               </p>
             )}
+
           </div>
 
           {/* Description */}
 
           <div className="md:col-span-2">
+
             <label className="block font-medium mb-2">
               Description *
             </label>
@@ -300,6 +435,7 @@ navigate("/tickets");
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             />
+
           </div>
 
         </div>
@@ -318,9 +454,14 @@ navigate("/tickets");
 
           <button
             type="submit"
-            className="px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+            disabled={loading}
+            className="px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
-            {mode === "edit"
+            {loading
+              ? mode === "edit"
+                ? "Updating..."
+                : "Creating..."
+              : mode === "edit"
               ? "Update Ticket"
               : "Create Ticket"}
           </button>
@@ -328,6 +469,7 @@ navigate("/tickets");
         </div>
 
       </div>
+
     </form>
   );
 }
