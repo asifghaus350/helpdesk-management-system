@@ -234,7 +234,7 @@ function Dashboard() {
           </div>
 
           <div className="p-6">
-            <RecentTickets />
+            <RecentTickets tickets={tickets} />
           </div>
 
         </div>

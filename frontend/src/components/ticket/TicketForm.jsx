@@ -6,7 +6,9 @@ function TicketForm({ mode = "create" }) {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  
+  // =========================
+  // FORM DATA
+  // =========================
 
   const [formData, setFormData] = useState({
     title: "",
@@ -17,29 +19,95 @@ function TicketForm({ mode = "create" }) {
     description: "",
   });
 
+  // =========================
+  // ENGINEERS
+  // =========================
+
+  const [engineers, setEngineers] = useState([]);
+  const [loadingEngineers, setLoadingEngineers] =
+    useState(true);
+
+  // =========================
+  // LOADING / ERROR
+  // =========================
+
   const [loading, setLoading] = useState(false);
+
   const [loadingTicket, setLoadingTicket] = useState(
-  mode === "edit" && Boolean(id)
-);
+    mode === "edit" && Boolean(id)
+  );
+
   const [error, setError] = useState("");
 
   // =========================
-  // FETCH ENGINEERS
+  // FETCH ACTIVE ENGINEERS
   // =========================
 
- const engineers =
-  JSON.parse(localStorage.getItem("users"))?.filter(
-    (user) =>
-      user.role === "Engineer" &&
-      user.status === "Active"
-  ) || [];
+  useEffect(() => {
+    const fetchEngineers = async () => {
+      try {
+        setLoadingEngineers(true);
+        setError("");
+
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        const response = await fetch(
+          "http://localhost:5000/api/users",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Failed to fetch engineers"
+          );
+        }
+
+        const activeEngineers = (
+          data.users || []
+        ).filter(
+          (user) =>
+            user.role === "Engineer" &&
+            user.status === "Active"
+        );
+
+        setEngineers(activeEngineers);
+      } catch (error) {
+        console.error(
+          "Fetch engineers error:",
+          error
+        );
+
+        setError(
+          error.message ||
+            "Unable to load engineers."
+        );
+      } finally {
+        setLoadingEngineers(false);
+      }
+    };
+
+    fetchEngineers();
+  }, [navigate]);
+
   // =========================
   // FETCH TICKET FOR EDIT
   // =========================
 
   useEffect(() => {
     if (mode !== "edit" || !id) {
-     
       return;
     }
 
@@ -69,7 +137,8 @@ function TicketForm({ mode = "create" }) {
 
         if (!response.ok) {
           throw new Error(
-            data.message || "Failed to fetch ticket"
+            data.message ||
+              "Failed to fetch ticket"
           );
         }
 
@@ -123,7 +192,10 @@ function TicketForm({ mode = "create" }) {
 
     setError("");
 
-    // Validation
+    // =========================
+    // VALIDATION
+    // =========================
+
     if (
       !formData.title ||
       !formData.category ||
@@ -134,6 +206,7 @@ function TicketForm({ mode = "create" }) {
       setError(
         "Please fill all required fields."
       );
+
       return;
     }
 
@@ -148,7 +221,7 @@ function TicketForm({ mode = "create" }) {
       }
 
       // =========================
-      // CREATE
+      // CREATE TICKET
       // =========================
 
       if (mode === "create") {
@@ -156,10 +229,12 @@ function TicketForm({ mode = "create" }) {
           "http://localhost:5000/api/tickets",
           {
             method: "POST",
+
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
+
             body: JSON.stringify({
               title: formData.title,
               description: formData.description,
@@ -180,11 +255,15 @@ function TicketForm({ mode = "create" }) {
           );
         }
 
+        // Notification respects ticketNotifications setting
         addNotification(
-          `New ticket ${data.ticket.ticketId} has been created.`
+          `New ticket ${data.ticket.ticketId} has been created.`,
+          "ticket"
         );
 
-        alert("Ticket created successfully!");
+        alert(
+          "Ticket created successfully!"
+        );
 
         navigate("/tickets");
 
@@ -192,7 +271,7 @@ function TicketForm({ mode = "create" }) {
       }
 
       // =========================
-      // UPDATE
+      // UPDATE TICKET
       // =========================
 
       if (mode === "edit") {
@@ -200,10 +279,12 @@ function TicketForm({ mode = "create" }) {
           `http://localhost:5000/api/tickets/${id}`,
           {
             method: "PUT",
+
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
+
             body: JSON.stringify({
               title: formData.title,
               description: formData.description,
@@ -224,11 +305,15 @@ function TicketForm({ mode = "create" }) {
           );
         }
 
+        // Notification respects ticketNotifications setting
         addNotification(
-          `Ticket ${id} has been updated.`
+          `Ticket ${id} has been updated.`,
+          "ticket"
         );
 
-        alert("Ticket updated successfully!");
+        alert(
+          "Ticket updated successfully!"
+        );
 
         navigate("/tickets");
       }
@@ -264,7 +349,9 @@ function TicketForm({ mode = "create" }) {
 
       <div className="bg-white rounded-2xl shadow-md p-8">
 
-        {/* Error */}
+        {/* =========================
+            ERROR
+        ========================= */}
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
@@ -272,13 +359,18 @@ function TicketForm({ mode = "create" }) {
           </div>
         )}
 
-        {/* Form Grid */}
+        {/* =========================
+            FORM GRID
+        ========================= */}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* Ticket Title */}
+          {/* =========================
+              TICKET TITLE
+          ========================= */}
 
           <div>
+
             <label className="block font-medium mb-2">
               Ticket Title *
             </label>
@@ -291,11 +383,15 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             />
+
           </div>
 
-          {/* Category */}
+          {/* =========================
+              CATEGORY
+          ========================= */}
 
           <div>
+
             <label className="block font-medium mb-2">
               Category *
             </label>
@@ -306,6 +402,7 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             >
+
               <option value="">
                 Select Category
               </option>
@@ -321,12 +418,17 @@ function TicketForm({ mode = "create" }) {
               <option value="Support">
                 Support
               </option>
+
             </select>
+
           </div>
 
-          {/* Priority */}
+          {/* =========================
+              PRIORITY
+          ========================= */}
 
           <div>
+
             <label className="block font-medium mb-2">
               Priority *
             </label>
@@ -337,6 +439,7 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             >
+
               <option value="">
                 Select Priority
               </option>
@@ -352,12 +455,17 @@ function TicketForm({ mode = "create" }) {
               <option value="Low">
                 Low
               </option>
+
             </select>
+
           </div>
 
-          {/* Status */}
+          {/* =========================
+              STATUS
+          ========================= */}
 
           <div>
+
             <label className="block font-medium mb-2">
               Status *
             </label>
@@ -368,6 +476,7 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             >
+
               <option value="Open">
                 Open
               </option>
@@ -379,10 +488,14 @@ function TicketForm({ mode = "create" }) {
               <option value="Closed">
                 Closed
               </option>
+
             </select>
+
           </div>
 
-          {/* Engineer */}
+          {/* =========================
+              ENGINEER
+          ========================= */}
 
           <div className="md:col-span-2">
 
@@ -394,32 +507,46 @@ function TicketForm({ mode = "create" }) {
               name="engineer"
               value={formData.engineer}
               onChange={handleChange}
-              className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
+              disabled={loadingEngineers}
+              className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
+
               <option value="">
-                Select Engineer
+                {loadingEngineers
+                  ? "Loading Engineers..."
+                  : "Select Engineer"}
               </option>
 
-              {engineers.map((engineer) => (
-                <option
-                  key={engineer.id}
-                  value={engineer.name}
-                >
-                  {engineer.name}
-                </option>
-              ))}
+              {engineers.map(
+                (engineer) => (
+                  <option
+                    key={
+                      engineer._id ||
+                      engineer.id
+                    }
+                    value={engineer.name}
+                  >
+                    {engineer.name}
+                  </option>
+                )
+              )}
+
             </select>
 
-            {engineers.length === 0 && (
-              <p className="text-sm text-red-500 mt-2">
-                No engineers available. Please add an Engineer
-                from User Management.
-              </p>
-            )}
+            {!loadingEngineers &&
+              engineers.length === 0 && (
+                <p className="text-sm text-red-500 mt-2">
+                  No active engineers available.
+                  Please add an active Engineer
+                  from User Management.
+                </p>
+              )}
 
           </div>
 
-          {/* Description */}
+          {/* =========================
+              DESCRIPTION
+          ========================= */}
 
           <div className="md:col-span-2">
 
@@ -440,13 +567,17 @@ function TicketForm({ mode = "create" }) {
 
         </div>
 
-        {/* Buttons */}
+        {/* =========================
+            BUTTONS
+        ========================= */}
 
         <div className="flex justify-end gap-4 mt-8">
 
           <button
             type="button"
-            onClick={() => navigate("/tickets")}
+            onClick={() =>
+              navigate("/tickets")
+            }
             className="px-6 py-3 rounded-xl border border-gray-300 hover:bg-gray-100"
           >
             Cancel
@@ -454,9 +585,13 @@ function TicketForm({ mode = "create" }) {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading ||
+              loadingEngineers
+            }
             className="px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
+
             {loading
               ? mode === "edit"
                 ? "Updating..."
@@ -464,6 +599,7 @@ function TicketForm({ mode = "create" }) {
               : mode === "edit"
               ? "Update Ticket"
               : "Create Ticket"}
+
           </button>
 
         </div>

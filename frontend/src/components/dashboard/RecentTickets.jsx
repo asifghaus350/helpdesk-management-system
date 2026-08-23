@@ -1,71 +1,11 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-function RecentTickets() {
+function RecentTickets({ tickets = [] }) {
   const navigate = useNavigate();
 
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  // =========================
-  // FETCH RECENT TICKETS
-  // =========================
-
-  useEffect(() => {
-    const fetchRecentTickets = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          navigate("/login");
-          return;
-        }
-
-        const response = await fetch(
-          "http://localhost:5000/api/tickets",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Failed to fetch recent tickets"
-          );
-        }
-
-        // Backend already returns newest tickets first.
-        // Show only latest 5.
-        setTickets(
-          (data.tickets || []).slice(0, 5)
-        );
-      } catch (error) {
-        console.error(
-          "Recent tickets error:",
-          error
-        );
-
-        setError(
-          error.message ||
-            "Unable to load recent tickets."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRecentTickets();
-  }, [navigate]);
+  // Backend se Dashboard ko jo tickets mile hain,
+  // unmein se latest 5 tickets show karo.
+  const recentTickets = tickets.slice(0, 5);
 
   // =========================
   // STATUS STYLE
@@ -108,145 +48,109 @@ function RecentTickets() {
   };
 
   // =========================
-  // LOADING
+  // NO TICKETS
   // =========================
 
-  if (loading) {
+  if (recentTickets.length === 0) {
     return (
       <div className="py-12 text-center">
         <p className="text-sm text-slate-500">
-          Loading recent tickets...
+          No recent tickets found.
+        </p>
+
+        <p className="text-xs text-slate-400 mt-1">
+          Newly created tickets will appear here.
         </p>
       </div>
     );
   }
 
   // =========================
-  // ERROR
+  // TICKETS TABLE
   // =========================
-
-  if (error) {
-    return (
-      <div className="py-12 text-center">
-        <p className="text-sm text-red-500">
-          {error}
-        </p>
-      </div>
-    );
-  }
 
   return (
-    <>
-      {tickets.length === 0 ? (
-        <div className="py-12 text-center">
+    <div className="overflow-x-auto">
+      <table className="w-full">
 
-          <p className="text-sm text-slate-500">
-            No recent tickets found.
-          </p>
+        {/* Table Header */}
 
-          <p className="text-xs text-slate-400 mt-1">
-            Newly created tickets will appear here.
-          </p>
+        <thead>
+          <tr className="border-b border-slate-100">
 
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
+            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              ID
+            </th>
 
-          <table className="w-full">
+            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Title
+            </th>
 
-            {/* Table Header */}
+            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Status
+            </th>
 
-            <thead>
+            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Priority
+            </th>
 
-              <tr className="border-b border-slate-100">
+          </tr>
+        </thead>
 
-                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  ID
-                </th>
+        {/* Table Body */}
 
-                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Title
-                </th>
+        <tbody>
+          {recentTickets.map((ticket) => (
+            <tr
+              key={ticket._id || ticket.ticketId}
+              onClick={() =>
+                navigate(`/tickets/${ticket.ticketId}`)
+              }
+              className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
 
-                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
-                </th>
+              {/* ID */}
 
-                <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Priority
-                </th>
+              <td className="py-4 px-3 text-sm font-medium text-slate-700">
+                #{ticket.ticketId}
+              </td>
 
-              </tr>
+              {/* Title */}
 
-            </thead>
+              <td className="py-4 px-3">
+                <p className="text-sm font-medium text-slate-800">
+                  {ticket.title}
+                </p>
+              </td>
 
-            {/* Table Body */}
+              {/* Status */}
 
-            <tbody>
-
-              {tickets.map((ticket) => (
-
-                <tr
-                  key={ticket.ticketId}
-                  onClick={() =>
-                    navigate(
-                      `/tickets/${ticket.ticketId}`
-                    )
-                  }
-                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
+              <td className="py-4 px-3">
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(
+                    ticket.status
+                  )}`}
                 >
+                  {ticket.status}
+                </span>
+              </td>
 
-                  {/* ID */}
+              {/* Priority */}
 
-                  <td className="py-4 px-3 text-sm font-medium text-slate-700">
-                    #{ticket.ticketId}
-                  </td>
+              <td
+                className={`py-4 px-3 text-sm font-medium ${getPriorityStyle(
+                  ticket.priority
+                )}`}
+              >
+                {ticket.priority}
+              </td>
 
-                  {/* Title */}
+            </tr>
+          ))}
+        </tbody>
 
-                  <td className="py-4 px-3">
-
-                    <p className="text-sm font-medium text-slate-800">
-                      {ticket.title}
-                    </p>
-
-                  </td>
-
-                  {/* Status */}
-
-                  <td className="py-4 px-3">
-
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(
-                        ticket.status
-                      )}`}
-                    >
-                      {ticket.status}
-                    </span>
-
-                  </td>
-
-                  {/* Priority */}
-
-                  <td
-                    className={`py-4 px-3 text-sm font-medium ${getPriorityStyle(
-                      ticket.priority
-                    )}`}
-                  >
-                    {ticket.priority}
-                  </td>
-
-                </tr>
-
-              ))}
-
-            </tbody>
-
-          </table>
-
-        </div>
-      )}
-    </>
+      </table>
+    </div>
   );
 }
 

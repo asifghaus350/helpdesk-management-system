@@ -1,740 +1,788 @@
-import { useState } from "react";
-
 import {
-  Search,
-  UserPlus,
-  Pencil,
-  Trash2,
-  X,
-} from "lucide-react";
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+
+import { useNavigate } from "react-router-dom";
 
 import Layout from "../components/layout/Layout";
+
 import { addNotification } from "../utils/notificationUtils";
 
 function UserManagement() {
-  // Search
-  const [search, setSearch] = useState("");
+  const navigate = useNavigate();
 
-  // Filters
-  const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  // =========================
+  // STATES
+  // =========================
 
-  // Add / Edit modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUserId, setEditingUserId] = useState(null);
+  const [users, setUsers] = useState([]);
 
-  // Delete modal
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Form data
+  const [error, setError] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
+
+  const [editingUser, setEditingUser] = useState(null);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     role: "User",
     status: "Active",
   });
 
-  // Users
-  const [users, setUsers] = useState(() => {
-    const savedUsers = localStorage.getItem("users");
+  // =========================
+  // FETCH USERS
+  // =========================
 
-    if (savedUsers) {
-      return JSON.parse(savedUsers);
+  const fetchUsers = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(
+        "http://localhost:5000/api/users",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to fetch users"
+        );
+      }
+
+      setUsers(data.users || []);
+      setError("");
+    } catch (error) {
+      console.error(
+        "Fetch users error:",
+        error
+      );
+
+      setError(
+        error.message ||
+          "Unable to load users."
+      );
+    } finally {
+      setLoading(false);
     }
+  }, [navigate]);
 
-    const defaultUsers = [
-      {
-        id: 1,
-        name: "Rahul Sharma",
-        email: "rahul@example.com",
-        role: "Engineer",
-        status: "Active",
-      },
-      {
-        id: 2,
-        name: "Aman Khan",
-        email: "aman@example.com",
-        role: "Engineer",
-        status: "Active",
-      },
-      {
-        id: 3,
-        name: "Priya Singh",
-        email: "priya@example.com",
-        role: "Admin",
-        status: "Inactive",
-      },
-    ];
+  // =========================
+  // INITIAL LOAD
+  // =========================
 
-    localStorage.setItem(
-      "users",
-      JSON.stringify(defaultUsers)
-    );
+useEffect(() => {
+  // Fetch data from the external API when the page loads.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  fetchUsers();
+}, [fetchUsers]);
 
-    return defaultUsers;
-  });
+  // =========================
+  // HANDLE INPUT
+  // =========================
 
-  // Handle input change
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData((prev) => ({
-      ...prev,
+    setFormData((previous) => ({
+      ...previous,
       [name]: value,
     }));
   };
 
-  // Open Add User Modal
-  const handleAddUser = () => {
-    setEditingUserId(null);
+  // =========================
+  // OPEN ADD MODAL
+  // =========================
+
+  const openAddModal = () => {
+    setEditingUser(null);
 
     setFormData({
       name: "",
       email: "",
+      password: "",
       role: "User",
       status: "Active",
     });
 
-    setIsModalOpen(true);
+    setError("");
+
+    setShowModal(true);
   };
 
-  // Open Edit User Modal
-  const handleEditUser = (user) => {
-    setEditingUserId(user.id);
+  // =========================
+  // OPEN EDIT MODAL
+  // =========================
+
+  const openEditModal = (user) => {
+    setEditingUser(user);
 
     setFormData({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
+      name: user.name || "",
+      email: user.email || "",
+      password: "",
+      role: user.role || "User",
+      status: user.status || "Active",
     });
 
-    setIsModalOpen(true);
+    setError("");
+
+    setShowModal(true);
   };
 
-  // Add / Update User
-  const handleSubmit = (e) => {
+  // =========================
+  // CLOSE MODAL
+  // =========================
+
+  const closeModal = () => {
+    setShowModal(false);
+
+    setEditingUser(null);
+
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      role: "User",
+      status: "Active",
+    });
+
+    setError("");
+  };
+
+  // =========================
+  // CREATE / UPDATE USER
+  // =========================
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email) {
-      alert("Please fill all required fields.");
+    try {
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      // =========================
+      // UPDATE USER
+      // =========================
+
+      if (editingUser) {
+        const updateBody = {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          status: formData.status,
+        };
+
+        // Password update only
+        // when user enters a new password
+        if (formData.password.trim()) {
+          updateBody.password =
+            formData.password;
+        }
+
+        const response = await fetch(
+          `http://localhost:5000/api/users/${editingUser._id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(updateBody),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Failed to update user"
+          );
+        }
+
+        // =========================
+        // USER NOTIFICATION
+        // =========================
+
+        addNotification(
+          `User ${data.user.name} was updated.`,
+          "user"
+        );
+
+        alert(
+          "User updated successfully!"
+        );
+
+        closeModal();
+
+        await fetchUsers();
+
+        return;
+      }
+
+      // =========================
+      // CREATE USER VALIDATION
+      // =========================
+
+      if (
+        !formData.name.trim() ||
+        !formData.email.trim() ||
+        !formData.password.trim()
+      ) {
+        setError(
+          "Name, email and password are required."
+        );
+
+        return;
+      }
+
+      // =========================
+      // CREATE USER
+      // =========================
+
+      const response = await fetch(
+        "http://localhost:5000/api/users",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to create user"
+        );
+      }
+
+      // =========================
+      // USER NOTIFICATION
+      // =========================
+
+      addNotification(
+        `User ${data.user.name} was added.`,
+        "user"
+      );
+
+      alert(
+        "User created successfully!"
+      );
+
+      closeModal();
+
+      await fetchUsers();
+    } catch (error) {
+      console.error(
+        "Save user error:",
+        error
+      );
+
+      setError(
+        error.message ||
+          "Something went wrong."
+      );
+    }
+  };
+
+  // =========================
+  // DELETE USER
+  // =========================
+
+  const handleDelete = async (user) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${user.name}?`
+    );
+
+    if (!confirmed) {
       return;
     }
 
-    // UPDATE USER
-    if (editingUserId !== null) {
-      const updatedUsers = users.map((user) =>
-        user.id === editingUserId
-          ? {
-              ...user,
-              ...formData,
-            }
-          : user
+    try {
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(
+        `http://localhost:5000/api/users/${user._id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
-      setUsers(updatedUsers);
+      const data = await response.json();
 
-      localStorage.setItem(
-        "users",
-        JSON.stringify(updatedUsers)
-      );
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to delete user"
+        );
+      }
+
+      // =========================
+      // USER NOTIFICATION
+      // =========================
 
       addNotification(
-        `User ${formData.name} was updated.`
+        `User ${user.name} was deleted.`,
+        "user"
       );
 
-      alert("User updated successfully!");
+      alert(
+        "User deleted successfully!"
+      );
 
-      setEditingUserId(null);
-      setIsModalOpen(false);
+      await fetchUsers();
+    } catch (error) {
+      console.error(
+        "Delete user error:",
+        error
+      );
 
-      setFormData({
-        name: "",
-        email: "",
-        role: "User",
-        status: "Active",
-      });
-
-      return;
-    }
-
-    // CREATE USER
-    const newUser = {
-      id:
-        users.length > 0
-          ? Math.max(...users.map((user) => user.id)) + 1
-          : 1,
-      ...formData,
-    };
-
-    const updatedUsers = [...users, newUser];
-
-    setUsers(updatedUsers);
-
-    localStorage.setItem(
-      "users",
-      JSON.stringify(updatedUsers)
-    );
-
-    addNotification(
-      `User ${newUser.name} was added.`
-    );
-
-    alert("User added successfully!");
-
-    setFormData({
-      name: "",
-      email: "",
-      role: "User",
-      status: "Active",
-    });
-
-    setIsModalOpen(false);
-  };
-
-  // Open Delete Modal
-  const handleDeleteClick = (id) => {
-    setSelectedUserId(id);
-    setIsDeleteOpen(true);
-  };
-
-  // Delete User
-  const handleDelete = () => {
-    const deletedUser = users.find(
-      (user) => user.id === selectedUserId
-    );
-
-    const updatedUsers = users.filter(
-      (user) => user.id !== selectedUserId
-    );
-
-    setUsers(updatedUsers);
-
-    localStorage.setItem(
-      "users",
-      JSON.stringify(updatedUsers)
-    );
-
-    if (deletedUser) {
-      addNotification(
-        `User ${deletedUser.name} was deleted.`
+      setError(
+        error.message ||
+          "Unable to delete user."
       );
     }
-
-    setIsDeleteOpen(false);
-    setSelectedUserId(null);
   };
 
-  // Search + Role + Status Filters
-  const filteredUsers = users.filter((user) => {
-    const searchText = search.toLowerCase();
+  // =========================
+  // LOADING
+  // =========================
 
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchText) ||
-      user.email.toLowerCase().includes(searchText) ||
-      user.role.toLowerCase().includes(searchText);
-
-    const matchesRole =
-      roleFilter === "" ||
-      user.role === roleFilter;
-
-    const matchesStatus =
-      statusFilter === "" ||
-      user.status === statusFilter;
-
+  if (loading) {
     return (
-      matchesSearch &&
-      matchesRole &&
-      matchesStatus
+      <Layout>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-10 text-center text-gray-500 dark:text-slate-400">
+          Loading users...
+        </div>
+      </Layout>
     );
-  });
+  }
+
+  // =========================
+  // MAIN UI
+  // =========================
 
   return (
     <Layout>
 
-      {/* Heading */}
+      {/* =========================
+          HEADER
+      ========================= */}
 
       <div className="flex justify-between items-start mb-8">
 
         <div>
 
-          <h1 className="text-3xl font-bold text-slate-800">
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
             User Management
           </h1>
 
-          <p className="text-gray-500 mt-2">
-            Manage users, roles and account status.
+          <p className="text-gray-500 dark:text-slate-400 mt-2">
+            Manage system users, roles and account status.
           </p>
 
         </div>
 
-        {/* Add User */}
-
         <button
-          onClick={handleAddUser}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-semibold transition"
+          type="button"
+          onClick={openAddModal}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold transition"
         >
-          <UserPlus size={18} />
-
-          Add User
+          + Add User
         </button>
 
       </div>
 
-      {/* Search & Filters */}
+      {/* =========================
+          ERROR
+      ========================= */}
 
-      <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
+      {error && !showModal && (
+        <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+          {error}
+        </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* =========================
+          USERS TABLE
+      ========================= */}
 
-          {/* Search */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md overflow-hidden">
 
-          <div className="relative">
+        <div className="overflow-x-auto">
 
-            <Search
-              size={18}
-              className="absolute left-3 top-3.5 text-gray-400"
-            />
+          <table className="w-full">
 
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={search}
-              onChange={(e) =>
-                setSearch(e.target.value)
-              }
-              className="w-full border rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {/* HEADER */}
 
-          </div>
+            <thead>
 
-          {/* Role Filter */}
+              <tr className="border-b border-gray-200 dark:border-slate-600">
 
-          <select
-            value={roleFilter}
-            onChange={(e) =>
-              setRoleFilter(e.target.value)
-            }
-            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">
-              All Roles
-            </option>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 dark:text-slate-400">
+                  Name
+                </th>
 
-            <option value="User">
-              User
-            </option>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 dark:text-slate-400">
+                  Email
+                </th>
 
-            <option value="Engineer">
-              Engineer
-            </option>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 dark:text-slate-400">
+                  Role
+                </th>
 
-            <option value="Admin">
-              Admin
-            </option>
-          </select>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 dark:text-slate-400">
+                  Status
+                </th>
 
-          {/* Status Filter */}
+                <th className="text-left px-6 py-4 text-sm font-semibold text-gray-500 dark:text-slate-400">
+                  Actions
+                </th>
 
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value)
-            }
-            className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">
-              All Status
-            </option>
+              </tr>
 
-            <option value="Active">
-              Active
-            </option>
+            </thead>
 
-            <option value="Inactive">
-              Inactive
-            </option>
-          </select>
+            {/* BODY */}
+
+            <tbody>
+
+              {users.length === 0 ? (
+
+                <tr>
+
+                  <td
+                    colSpan="5"
+                    className="text-center py-10 text-gray-500 dark:text-slate-400"
+                  >
+                    No users found.
+                  </td>
+
+                </tr>
+
+              ) : (
+
+                users.map((user) => (
+
+                  <tr
+                    key={user._id}
+                    className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition"
+                  >
+
+                    {/* NAME */}
+
+                    <td className="px-6 py-4">
+
+                      <p className="font-medium text-slate-800 dark:text-white">
+                        {user.name}
+                      </p>
+
+                    </td>
+
+                    {/* EMAIL */}
+
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300">
+                      {user.email}
+                    </td>
+
+                    {/* ROLE */}
+
+                    <td className="px-6 py-4">
+
+                      <span className="px-3 py-1 rounded-full text-sm bg-blue-50 text-blue-600">
+                        {user.role}
+                      </span>
+
+                    </td>
+
+                    {/* STATUS */}
+
+                    <td className="px-6 py-4">
+
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          user.status === "Active"
+                            ? "bg-green-50 text-green-600"
+                            : "bg-red-50 text-red-600"
+                        }`}
+                      >
+                        {user.status}
+                      </span>
+
+                    </td>
+
+                    {/* ACTIONS */}
+
+                    <td className="px-6 py-4">
+
+                      <div className="flex gap-3">
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openEditModal(user)
+                          }
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDelete(user)
+                          }
+                          className="text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Delete
+                        </button>
+
+                      </div>
+
+                    </td>
+
+                  </tr>
+
+                ))
+
+              )}
+
+            </tbody>
+
+          </table>
 
         </div>
 
       </div>
 
-      {/* Users Table */}
+      {/* =========================
+          ADD / EDIT MODAL
+      ========================= */}
 
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+      {showModal && (
 
-        <table className="w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
 
-          <thead className="bg-slate-100">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg p-8">
 
-            <tr>
+            {/* MODAL HEADER */}
 
-              <th className="text-left p-4">
-                ID
-              </th>
+            <div className="flex justify-between items-center mb-6">
 
-              <th className="text-left p-4">
-                Name
-              </th>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
 
-              <th className="text-left p-4">
-                Email
-              </th>
+                {editingUser
+                  ? "Edit User"
+                  : "Add User"}
 
-              <th className="text-left p-4">
-                Role
-              </th>
-
-              <th className="text-left p-4">
-                Status
-              </th>
-
-              <th className="text-center p-4">
-                Actions
-              </th>
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {filteredUsers.length === 0 ? (
-
-              <tr>
-
-                <td
-                  colSpan="6"
-                  className="text-center py-10 text-gray-500"
-                >
-                  No users found.
-                </td>
-
-              </tr>
-
-            ) : (
-
-              filteredUsers.map((user) => (
-
-                <tr
-                  key={user.id}
-                  className="border-t hover:bg-slate-50 transition"
-                >
-
-                  {/* ID */}
-
-                  <td className="p-4 font-medium">
-                    #{user.id}
-                  </td>
-
-                  {/* Name */}
-
-                  <td className="p-4">
-                    {user.name}
-                  </td>
-
-                  {/* Email */}
-
-                  <td className="p-4 text-gray-600">
-                    {user.email}
-                  </td>
-
-                  {/* Role */}
-
-                  <td className="p-4">
-
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                      {user.role}
-                    </span>
-
-                  </td>
-
-                  {/* Status */}
-
-                  <td className="p-4">
-
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        user.status === "Active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {user.status}
-                    </span>
-
-                  </td>
-
-                  {/* Actions */}
-
-                  <td className="p-4">
-
-                    <div className="flex justify-center gap-4">
-
-                      {/* Edit */}
-
-                      <button
-                        onClick={() =>
-                          handleEditUser(user)
-                        }
-                        className="text-green-600 hover:text-green-800"
-                        title="Edit User"
-                      >
-                        <Pencil size={18} />
-                      </button>
-
-                      {/* Delete */}
-
-                      <button
-                        onClick={() =>
-                          handleDeleteClick(user.id)
-                        }
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete User"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-
-                    </div>
-
-                  </td>
-
-                </tr>
-
-              ))
-
-            )}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
-      {/* Add / Edit User Modal */}
-
-      {isModalOpen && (
-
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-
-            {/* Modal Header */}
-
-            <div className="flex items-center justify-between p-6 border-b">
-
-              <div>
-
-                <h2 className="text-xl font-bold text-slate-800">
-
-                  {editingUserId !== null
-                    ? "Edit User"
-                    : "Add New User"}
-
-                </h2>
-
-                <p className="text-sm text-gray-500 mt-1">
-
-                  {editingUserId !== null
-                    ? "Update user information."
-                    : "Create a new user account."}
-
-                </p>
-
-              </div>
+              </h2>
 
               <button
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setEditingUserId(null);
-                }}
-                className="text-gray-500 hover:text-gray-800"
+                type="button"
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl"
               >
-                <X size={22} />
+                ×
               </button>
 
             </div>
 
-            {/* Form */}
+            {/* MODAL ERROR */}
 
-            <form
-              onSubmit={handleSubmit}
-              className="p-6 space-y-5"
-            >
+            {error && (
+              <div className="mb-5 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+                {error}
+              </div>
+            )}
 
-              {/* Name */}
+            {/* FORM */}
 
-              <div>
+            <form onSubmit={handleSubmit}>
 
-                <label className="block font-medium mb-2">
-                  Name *
-                </label>
+              <div className="space-y-5">
 
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Enter user name"
-                  className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                {/* NAME */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Name
+                  </label>
+
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  />
+
+                </div>
+
+                {/* EMAIL */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Email
+                  </label>
+
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  />
+
+                </div>
+
+                {/* PASSWORD */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Password
+                  </label>
+
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder={
+                      editingUser
+                        ? "Leave blank to keep current password"
+                        : "Enter password"
+                    }
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  />
+
+                </div>
+
+                {/* ROLE */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Role
+                  </label>
+
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  >
+
+                    <option value="Admin">
+                      Admin
+                    </option>
+
+                    <option value="Engineer">
+                      Engineer
+                    </option>
+
+                    <option value="User">
+                      User
+                    </option>
+
+                  </select>
+
+                </div>
+
+                {/* STATUS */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Status
+                  </label>
+
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  >
+
+                    <option value="Active">
+                      Active
+                    </option>
+
+                    <option value="Inactive">
+                      Inactive
+                    </option>
+
+                  </select>
+
+                </div>
 
               </div>
 
-              {/* Email */}
+              {/* BUTTONS */}
 
-              <div>
-
-                <label className="block font-medium mb-2">
-                  Email *
-                </label>
-
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Enter email address"
-                  className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                />
-
-              </div>
-
-              {/* Role */}
-
-              <div>
-
-                <label className="block font-medium mb-2">
-                  Role
-                </label>
-
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                >
-
-                  <option value="User">
-                    User
-                  </option>
-
-                  <option value="Engineer">
-                    Engineer
-                  </option>
-
-                  <option value="Admin">
-                    Admin
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* Status */}
-
-              <div>
-
-                <label className="block font-medium mb-2">
-                  Status
-                </label>
-
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                >
-
-                  <option value="Active">
-                    Active
-                  </option>
-
-                  <option value="Inactive">
-                    Inactive
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* Buttons */}
-
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="flex justify-end gap-4 mt-8">
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    setEditingUserId(null);
-                  }}
-                  className="px-5 py-3 rounded-xl border hover:bg-gray-100"
+                  onClick={closeModal}
+                  className="px-6 py-3 rounded-xl border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-white hover:bg-gray-100 dark:hover:bg-slate-700"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition"
                 >
-
-                  {editingUserId !== null
+                  {editingUser
                     ? "Update User"
                     : "Create User"}
-
                 </button>
 
               </div>
 
             </form>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {/* Delete User Modal */}
-
-      {isDeleteOpen && (
-
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-
-            <h2 className="text-xl font-bold text-slate-800">
-              Delete User
-            </h2>
-
-            <p className="text-gray-500 mt-2">
-              Are you sure you want to delete this user?
-              This action cannot be undone.
-            </p>
-
-            <div className="flex justify-end gap-3 mt-6">
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDeleteOpen(false);
-                  setSelectedUserId(null);
-                }}
-                className="px-5 py-3 rounded-xl border hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-5 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700"
-              >
-                Delete User
-              </button>
-
-            </div>
 
           </div>
 

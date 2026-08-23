@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 
 const authRoutes = require("./routes/authRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const connectDB = require("./config/db");
 
@@ -18,6 +19,8 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
+
+
 // =========================
 // AUTH ROUTES
 // =========================
@@ -29,6 +32,12 @@ app.use("/api/auth", authRoutes);
 // =========================
 
 app.use("/api/tickets", ticketRoutes);
+
+
+// =========================
+// USER ROUTES
+// =========================
+app.use("/api/users", userRoutes);
 
 // =========================
 // TEST ROUTE
