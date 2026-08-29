@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+
 import Layout from "../components/layout/Layout";
+import TicketComments from "../components/ticket/TicketComments";
+
+import TicketActivity from "../components/ticket/TicketActivity";
 
 function TicketDetails() {
   const { id } = useParams();
@@ -22,7 +26,9 @@ function TicketDetails() {
         const token = localStorage.getItem("token");
 
         if (!token) {
-          setError("Authentication required. Please login.");
+          setError(
+            "Authentication required. Please login."
+          );
           return;
         }
 
@@ -46,10 +52,14 @@ function TicketDetails() {
 
         setTicket(data.ticket);
       } catch (error) {
-        console.error("Fetch ticket error:", error);
+        console.error(
+          "Fetch ticket error:",
+          error
+        );
 
         setError(
-          error.message || "Unable to load ticket."
+          error.message ||
+            "Unable to load ticket."
         );
       } finally {
         setLoading(false);
@@ -80,6 +90,7 @@ function TicketDetails() {
   if (error || !ticket) {
     return (
       <Layout>
+
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
           Ticket Not Found
         </h1>
@@ -95,6 +106,7 @@ function TicketDetails() {
         >
           Back to Tickets
         </Link>
+
       </Layout>
     );
   }
@@ -102,7 +114,9 @@ function TicketDetails() {
   return (
     <Layout>
 
-      {/* Heading */}
+      {/* =========================
+          HEADING
+      ========================= */}
 
       <div className="flex justify-between items-start mb-8">
 
@@ -127,7 +141,9 @@ function TicketDetails() {
 
       </div>
 
-      {/* Ticket Card */}
+      {/* =========================
+          TICKET CARD
+      ========================= */}
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-8 space-y-6">
 
@@ -267,7 +283,9 @@ function TicketDetails() {
 
         </div>
 
-        {/* Buttons */}
+        {/* =========================
+            BUTTONS
+        ========================= */}
 
         <div className="flex justify-end gap-4 pt-4">
 
@@ -288,6 +306,22 @@ function TicketDetails() {
         </div>
 
       </div>
+
+     {/* =========================
+    TICKET COMMENTS
+========================= */}
+
+<TicketComments
+  ticketId={ticket.ticketId}
+/>
+
+{/* =========================
+    TICKET ACTIVITY
+========================= */}
+
+<TicketActivity
+  ticketId={ticket.ticketId}
+/>
 
     </Layout>
   );

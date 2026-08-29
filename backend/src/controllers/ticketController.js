@@ -1,4 +1,5 @@
 const Ticket = require("../models/Ticket");
+const Activity = require("../models/Activity");
 
 // =========================
 // CREATE TICKET
@@ -19,7 +20,8 @@ const createTicket = async (req, res) => {
     if (!title || !description || !category) {
       return res.status(400).json({
         success: false,
-        message: "Title, description and category are required",
+        message:
+          "Title, description and category are required",
       });
     }
 
@@ -55,17 +57,49 @@ const createTicket = async (req, res) => {
       createdBy: req.user.id,
     });
 
+    // =========================
+    // CREATE ACTIVITY
+    // =========================
+
+    await Activity.create({
+      ticket: ticket._id,
+      user: req.user.id,
+      action: "Ticket Created",
+      message: `Ticket ${ticket.ticketId} was created`,
+      oldValue: "",
+      newValue: ticket.ticketId,
+    });
+
+    // =========================
+    // ASSIGNMENT ACTIVITY
+    // =========================
+
+    if (engineer) {
+      await Activity.create({
+        ticket: ticket._id,
+        user: req.user.id,
+        action: "Ticket Assigned",
+        message: `Ticket assigned to ${engineer}`,
+        oldValue: "",
+        newValue: engineer,
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: "Ticket created successfully",
       ticket,
     });
   } catch (error) {
-    console.error("Create ticket error:", error.message);
+    console.error(
+      "Create ticket error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
-      message: "Server error while creating ticket",
+      message:
+        "Server error while creating ticket",
     });
   }
 };
@@ -89,11 +123,15 @@ const getTickets = async (req, res) => {
       tickets,
     });
   } catch (error) {
-    console.error("Get tickets error:", error.message);
+    console.error(
+      "Get tickets error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
-      message: "Server error while fetching tickets",
+      message:
+        "Server error while fetching tickets",
     });
   }
 };
@@ -123,11 +161,15 @@ const getTicketById = async (req, res) => {
       ticket,
     });
   } catch (error) {
-    console.error("Get ticket error:", error.message);
+    console.error(
+      "Get ticket error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
-      message: "Server error while fetching ticket",
+      message:
+        "Server error while fetching ticket",
     });
   }
 };
@@ -158,6 +200,17 @@ const updateTicket = async (req, res) => {
       });
     }
 
+    // Store old values before update
+    const oldPriority = ticket.priority;
+    const oldStatus = ticket.status;
+    const oldEngineer = ticket.engineer;
+
+    // Track whether basic information changed
+    const basicFieldsChanged =
+      title !== undefined ||
+      description !== undefined ||
+      category !== undefined;
+
     // Update fields only if provided
     if (title !== undefined) {
       ticket.title = title;
@@ -185,17 +238,93 @@ const updateTicket = async (req, res) => {
 
     await ticket.save();
 
+    // =========================
+    // BASIC UPDATE ACTIVITY
+    // =========================
+
+    if (basicFieldsChanged) {
+      await Activity.create({
+        ticket: ticket._id,
+        user: req.user.id,
+        action: "Ticket Updated",
+        message: `Ticket ${ticket.ticketId} information was updated`,
+        oldValue: "",
+        newValue: "",
+      });
+    }
+
+    // =========================
+    // PRIORITY ACTIVITY
+    // =========================
+
+    if (
+      priority !== undefined &&
+      oldPriority !== ticket.priority
+    ) {
+      await Activity.create({
+        ticket: ticket._id,
+        user: req.user.id,
+        action: "Priority Changed",
+        message: `Priority changed from ${oldPriority} to ${ticket.priority}`,
+        oldValue: oldPriority,
+        newValue: ticket.priority,
+      });
+    }
+
+    // =========================
+    // STATUS ACTIVITY
+    // =========================
+
+    if (
+      status !== undefined &&
+      oldStatus !== ticket.status
+    ) {
+      await Activity.create({
+        ticket: ticket._id,
+        user: req.user.id,
+        action: "Status Changed",
+        message: `Status changed from ${oldStatus} to ${ticket.status}`,
+        oldValue: oldStatus,
+        newValue: ticket.status,
+      });
+    }
+
+    // =========================
+    // ENGINEER ASSIGNMENT
+    // =========================
+
+    if (
+      engineer !== undefined &&
+      oldEngineer !== ticket.engineer
+    ) {
+      await Activity.create({
+        ticket: ticket._id,
+        user: req.user.id,
+        action: "Ticket Assigned",
+        message: ticket.engineer
+          ? `Ticket assigned to ${ticket.engineer}`
+          : "Ticket assignment removed",
+        oldValue: oldEngineer || "Unassigned",
+        newValue:
+          ticket.engineer || "Unassigned",
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: "Ticket updated successfully",
       ticket,
     });
   } catch (error) {
-    console.error("Update ticket error:", error.message);
+    console.error(
+      "Update ticket error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
-      message: "Server error while updating ticket",
+      message:
+        "Server error while updating ticket",
     });
   }
 };
@@ -217,8 +346,27 @@ const deleteTicket = async (req, res) => {
       });
     }
 
+    // =========================
+    // LOG DELETE ACTIVITY
+    // =========================
+
+    await Activity.create({
+      ticket: ticket._id,
+      user: req.user.id,
+      action: "Ticket Deleted",
+      message: `Ticket ${ticket.ticketId} was deleted`,
+      oldValue: ticket.ticketId,
+      newValue: "",
+    });
+
+    // Delete ticket
     await Ticket.deleteOne({
       ticketId: req.params.id,
+    });
+
+    // Delete related activities
+    await Activity.deleteMany({
+      ticket: ticket._id,
     });
 
     res.status(200).json({
@@ -226,11 +374,15 @@ const deleteTicket = async (req, res) => {
       message: "Ticket deleted successfully",
     });
   } catch (error) {
-    console.error("Delete ticket error:", error.message);
+    console.error(
+      "Delete ticket error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
-      message: "Server error while deleting ticket",
+      message:
+        "Server error while deleting ticket",
     });
   }
 };
