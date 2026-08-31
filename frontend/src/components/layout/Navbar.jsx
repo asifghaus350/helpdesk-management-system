@@ -13,24 +13,93 @@ import NotificationDropdown from "../common/NotificationDropdown";
 function Navbar() {
   const navigate = useNavigate();
 
-  const [theme, setTheme] = useState(() => {
-    const savedSettings = localStorage.getItem("settings");
+  // =========================
+  // LOGGED-IN USER
+  // =========================
 
-    if (savedSettings) {
-      return JSON.parse(savedSettings).theme || "light";
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("user");
+
+      return savedUser
+        ? JSON.parse(savedUser)
+        : null;
+    } catch (error) {
+      console.error("Invalid user data:", error);
+      return null;
     }
-
-    return "light";
   });
+
+  // =========================
+  // THEME
+  // =========================
+
+  const [theme, setTheme] = useState(() => {
+    try {
+      const savedSettings =
+        localStorage.getItem("settings");
+
+      if (savedSettings) {
+        const parsedSettings =
+          JSON.parse(savedSettings);
+
+        return parsedSettings.theme || "light";
+      }
+
+      return "light";
+    } catch (error) {
+      console.error(
+        "Invalid settings data:",
+        error
+      );
+
+      return "light";
+    }
+  });
+
+  // =========================
+  // SETTINGS + USER CHANGE
+  // =========================
 
   useEffect(() => {
     const handleSettingsChange = () => {
-      const savedSettings = localStorage.getItem("settings");
+      try {
+        const savedSettings =
+          localStorage.getItem("settings");
 
-      if (savedSettings) {
-        const parsedSettings = JSON.parse(savedSettings);
+        if (savedSettings) {
+          const parsedSettings =
+            JSON.parse(savedSettings);
 
-        setTheme(parsedSettings.theme || "light");
+          setTheme(
+            parsedSettings.theme || "light"
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Settings update error:",
+          error
+        );
+      }
+    };
+
+    const handleUserChange = () => {
+      try {
+        const savedUser =
+          localStorage.getItem("user");
+
+        setUser(
+          savedUser
+            ? JSON.parse(savedUser)
+            : null
+        );
+      } catch (error) {
+        console.error(
+          "User update error:",
+          error
+        );
+
+        setUser(null);
       }
     };
 
@@ -39,29 +108,51 @@ function Navbar() {
       handleSettingsChange
     );
 
+    window.addEventListener(
+      "userChanged",
+      handleUserChange
+    );
+
     return () => {
       window.removeEventListener(
         "settingsChanged",
         handleSettingsChange
+      );
+
+      window.removeEventListener(
+        "userChanged",
+        handleUserChange
       );
     };
   }, []);
 
   const isDark = theme === "dark";
 
+  // =========================
+  // USER DISPLAY DATA
+  // =========================
+
+  const userName = user?.name || "User";
+  const userRole = user?.role || "User";
+
   return (
     <header
-      className={`h-[86px] px-8 flex items-center justify-between border-b transition-colors ${
+      className={`h-21.5 px-8 flex items-center justify-between border-b transition-colors ${
         isDark
           ? "bg-slate-900 border-slate-700"
           : "bg-white border-slate-200"
       }`}
     >
-      {/* Page Information */}
+      {/* =========================
+          PAGE INFORMATION
+      ========================= */}
+
       <div>
         <h1
           className={`text-2xl font-bold tracking-tight ${
-            isDark ? "text-white" : "text-slate-800"
+            isDark
+              ? "text-white"
+              : "text-slate-800"
           }`}
         >
           Dashboard
@@ -74,14 +165,20 @@ function Navbar() {
               : "text-slate-500"
           }`}
         >
-          Welcome back, Admin 👋
+          Welcome back, {userName} 👋
         </p>
       </div>
 
-      {/* Right Section */}
+      {/* =========================
+          RIGHT SECTION
+      ========================= */}
+
       <div className="flex items-center gap-4">
 
-        {/* Search */}
+        {/* =========================
+            SEARCH
+        ========================= */}
+
         <div className="relative">
           <Search
             size={18}
@@ -103,7 +200,10 @@ function Navbar() {
           />
         </div>
 
-        {/* Notifications */}
+        {/* =========================
+            NOTIFICATIONS
+        ========================= */}
+
         <div
           className={`w-11 h-11 rounded-xl flex items-center justify-center transition ${
             isDark
@@ -114,7 +214,10 @@ function Navbar() {
           <NotificationDropdown />
         </div>
 
-        {/* Settings */}
+        {/* =========================
+            SETTINGS
+        ========================= */}
+
         <button
           type="button"
           onClick={() => navigate("/settings")}
@@ -127,7 +230,10 @@ function Navbar() {
           <Settings size={21} />
         </button>
 
-        {/* Profile */}
+        {/* =========================
+            PROFILE
+        ========================= */}
+
         <button
           type="button"
           onClick={() => navigate("/profile")}
@@ -150,7 +256,7 @@ function Navbar() {
                   : "text-slate-800"
               }`}
             >
-              Admin
+              {userName}
             </p>
 
             <p
@@ -160,7 +266,7 @@ function Navbar() {
                   : "text-slate-500"
               }`}
             >
-              Administrator
+              {userRole}
             </p>
           </div>
         </button>

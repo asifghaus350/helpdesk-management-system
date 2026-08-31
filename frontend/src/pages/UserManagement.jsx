@@ -4,6 +4,11 @@ import {
   useState,
 } from "react";
 
+import {
+  Eye,
+  EyeOff,
+} from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
 
 import Layout from "../components/layout/Layout";
@@ -25,7 +30,11 @@ function UserManagement() {
 
   const [showModal, setShowModal] = useState(false);
 
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingUser, setEditingUser] =
+    useState(null);
+
+  const [showPassword, setShowPassword] =
+    useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -33,6 +42,8 @@ function UserManagement() {
     password: "",
     role: "User",
     status: "Active",
+    phone: "",
+    department: "",
   });
 
   // =========================
@@ -41,6 +52,7 @@ function UserManagement() {
 
   const fetchUsers = useCallback(async () => {
     try {
+    
       const token = localStorage.getItem("token");
 
       if (!token) {
@@ -52,6 +64,7 @@ function UserManagement() {
         "http://localhost:5000/api/users",
         {
           method: "GET",
+
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -88,11 +101,64 @@ function UserManagement() {
   // INITIAL LOAD
   // =========================
 
-useEffect(() => {
-  // Fetch data from the external API when the page loads.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  fetchUsers();
-}, [fetchUsers]);
+  useEffect(() => {
+  let cancelled = false;
+
+  const loadUsers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(
+        "http://localhost:5000/api/users",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to fetch users"
+        );
+      }
+
+      if (!cancelled) {
+        setUsers(data.users || []);
+        setError("");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(
+        "Fetch users error:",
+        error
+      );
+
+      if (!cancelled) {
+        setError(
+          error.message ||
+            "Unable to load users."
+        );
+
+        setLoading(false);
+      }
+    }
+  };
+
+  loadUsers();
+
+  return () => {
+    cancelled = true;
+  };
+}, [navigate]);
 
   // =========================
   // HANDLE INPUT
@@ -114,12 +180,16 @@ useEffect(() => {
   const openAddModal = () => {
     setEditingUser(null);
 
+    setShowPassword(false);
+
     setFormData({
       name: "",
       email: "",
       password: "",
       role: "User",
       status: "Active",
+      phone: "",
+      department: "",
     });
 
     setError("");
@@ -134,12 +204,17 @@ useEffect(() => {
   const openEditModal = (user) => {
     setEditingUser(user);
 
+    setShowPassword(false);
+
     setFormData({
       name: user.name || "",
       email: user.email || "",
       password: "",
       role: user.role || "User",
       status: user.status || "Active",
+      phone: user.phone || "",
+      department:
+        user.department || "",
     });
 
     setError("");
@@ -156,12 +231,16 @@ useEffect(() => {
 
     setEditingUser(null);
 
+    setShowPassword(false);
+
     setFormData({
       name: "",
       email: "",
       password: "",
       role: "User",
       status: "Active",
+      phone: "",
+      department: "",
     });
 
     setError("");
@@ -177,10 +256,26 @@ useEffect(() => {
     try {
       setError("");
 
-      const token = localStorage.getItem("token");
+      const token =
+        localStorage.getItem("token");
 
       if (!token) {
         navigate("/login");
+        return;
+      }
+
+      // =========================
+      // BASIC VALIDATION
+      // =========================
+
+      if (
+        !formData.name.trim() ||
+        !formData.email.trim()
+      ) {
+        setError(
+          "Name and email are required."
+        );
+
         return;
       }
 
@@ -190,15 +285,26 @@ useEffect(() => {
 
       if (editingUser) {
         const updateBody = {
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
           role: formData.role,
           status: formData.status,
+          phone: formData.phone.trim(),
+          department:
+            formData.department.trim(),
         };
 
-        // Password update only
-        // when user enters a new password
+        // Password is optional during edit.
+        // Blank = keep existing password.
         if (formData.password.trim()) {
+          if (formData.password.length < 6) {
+            setError(
+              "Password must be at least 6 characters long."
+            );
+
+            return;
+          }
+
           updateBody.password =
             formData.password;
         }
@@ -207,15 +313,20 @@ useEffect(() => {
           `http://localhost:5000/api/users/${editingUser._id}`,
           {
             method: "PUT",
+
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type":
+                "application/json",
+
               Authorization: `Bearer ${token}`,
             },
+
             body: JSON.stringify(updateBody),
           }
         );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           throw new Error(
@@ -225,7 +336,7 @@ useEffect(() => {
         }
 
         // =========================
-        // USER NOTIFICATION
+        // NOTIFICATION
         // =========================
 
         addNotification(
@@ -248,13 +359,17 @@ useEffect(() => {
       // CREATE USER VALIDATION
       // =========================
 
-      if (
-        !formData.name.trim() ||
-        !formData.email.trim() ||
-        !formData.password.trim()
-      ) {
+      if (!formData.password.trim()) {
         setError(
-          "Name, email and password are required."
+          "Password is required when creating a user."
+        );
+
+        return;
+      }
+
+      if (formData.password.length < 6) {
+        setError(
+          "Password must be at least 6 characters long."
         );
 
         return;
@@ -268,15 +383,29 @@ useEffect(() => {
         "http://localhost:5000/api/users",
         {
           method: "POST",
+
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
+
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(formData),
+
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            password: formData.password,
+            role: formData.role,
+            status: formData.status,
+            phone: formData.phone.trim(),
+            department:
+              formData.department.trim(),
+          }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -286,7 +415,7 @@ useEffect(() => {
       }
 
       // =========================
-      // USER NOTIFICATION
+      // NOTIFICATION
       // =========================
 
       addNotification(
@@ -319,9 +448,10 @@ useEffect(() => {
   // =========================
 
   const handleDelete = async (user) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete ${user.name}?`
-    );
+    const confirmed =
+      window.confirm(
+        `Are you sure you want to delete ${user.name}?`
+      );
 
     if (!confirmed) {
       return;
@@ -330,7 +460,8 @@ useEffect(() => {
     try {
       setError("");
 
-      const token = localStorage.getItem("token");
+      const token =
+        localStorage.getItem("token");
 
       if (!token) {
         navigate("/login");
@@ -341,13 +472,15 @@ useEffect(() => {
         `http://localhost:5000/api/users/${user._id}`,
         {
           method: "DELETE",
+
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -355,10 +488,6 @@ useEffect(() => {
             "Failed to delete user"
         );
       }
-
-      // =========================
-      // USER NOTIFICATION
-      // =========================
 
       addNotification(
         `User ${user.name} was deleted.`,
@@ -411,7 +540,6 @@ useEffect(() => {
       <div className="flex justify-between items-start mb-8">
 
         <div>
-
           <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
             User Management
           </h1>
@@ -419,7 +547,6 @@ useEffect(() => {
           <p className="text-gray-500 dark:text-slate-400 mt-2">
             Manage system users, roles and account status.
           </p>
-
         </div>
 
         <button
@@ -602,7 +729,7 @@ useEffect(() => {
 
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg p-8">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg p-8 max-h-[90vh] overflow-y-auto">
 
             {/* MODAL HEADER */}
 
@@ -653,6 +780,7 @@ useEffect(() => {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
+                    placeholder="Enter full name"
                     className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
                   />
 
@@ -671,6 +799,7 @@ useEffect(() => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
+                    placeholder="Enter email"
                     className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
                   />
 
@@ -681,21 +810,64 @@ useEffect(() => {
                 <div>
 
                   <label className="block font-medium mb-2 text-slate-800 dark:text-white">
-                    Password
+                    {editingUser
+                      ? "New Password"
+                      : "Password"}
                   </label>
 
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder={
-                      editingUser
-                        ? "Leave blank to keep current password"
-                        : "Enter password"
-                    }
-                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
-                  />
+                  <div className="relative">
+
+                    <input
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder={
+                        editingUser
+                          ? "Leave blank to keep current password"
+                          : "Enter password"
+                      }
+                      autoComplete={
+                        editingUser
+                          ? "new-password"
+                          : "new-password"
+                      }
+                      className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 pr-12 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPassword(
+                          (previous) =>
+                            !previous
+                        )
+                      }
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                      aria-label={
+                        showPassword
+                          ? "Hide password"
+                          : "Show password"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff size={20} />
+                      ) : (
+                        <Eye size={20} />
+                      )}
+                    </button>
+
+                  </div>
+
+                  {editingUser && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      Leave this field blank to keep the current password.
+                    </p>
+                  )}
 
                 </div>
 
@@ -754,6 +926,44 @@ useEffect(() => {
                     </option>
 
                   </select>
+
+                </div>
+
+                {/* PHONE */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Phone
+                  </label>
+
+                  <input
+                    type="text"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="Enter phone number"
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  />
+
+                </div>
+
+                {/* DEPARTMENT */}
+
+                <div>
+
+                  <label className="block font-medium mb-2 text-slate-800 dark:text-white">
+                    Department
+                  </label>
+
+                  <input
+                    type="text"
+                    name="department"
+                    value={formData.department}
+                    onChange={handleChange}
+                    placeholder="Enter department"
+                    className="w-full border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
+                  />
 
                 </div>
 

@@ -11,6 +11,7 @@ import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
 import Settings from "../pages/Settings";
 import Reports from "../pages/Reports";
+import AccessDenied from "../pages/AccessDenied";
 
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 
@@ -19,20 +20,34 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
 
-        {/* Public Route */}
+        {/* =========================
+            PUBLIC ROUTES
+        ========================= */}
 
         <Route path="/" element={<Login />} />
 
         <Route path="/login" element={<Login />} />
 
-        {/* Protected Routes */}
+        {/* =========================
+            AUTHENTICATED ROUTES
+        ========================= */}
 
         <Route element={<ProtectedRoute />}>
+
+          {/* Dashboard */}
 
           <Route
             path="/dashboard"
             element={<Dashboard />}
           />
+
+
+          <Route
+            path="/access-denied"
+            element={<AccessDenied />}
+         />
+
+          {/* Tickets */}
 
           <Route
             path="/tickets"
@@ -54,20 +69,21 @@ function AppRoutes() {
             element={<TicketDetails />}
           />
 
-          <Route
-            path="/users"
-            element={<UserManagement />}
-          />
+          {/* Profile */}
 
           <Route
             path="/profile"
             element={<Profile />}
           />
 
+          {/* Settings */}
+
           <Route
             path="/settings"
             element={<Settings />}
           />
+
+          {/* Reports */}
 
           <Route
             path="/reports"
@@ -76,7 +92,26 @@ function AppRoutes() {
 
         </Route>
 
-        {/* 404 */}
+        {/* =========================
+            ADMIN ONLY ROUTES
+        ========================= */}
+
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["Admin"]} />
+          }
+        >
+
+          <Route
+            path="/users"
+            element={<UserManagement />}
+          />
+
+        </Route>
+
+        {/* =========================
+            404
+        ========================= */}
 
         <Route
           path="*"

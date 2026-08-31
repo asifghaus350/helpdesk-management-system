@@ -9,6 +9,7 @@ const {
 } = require("../controllers/ticketController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const authorizeRoles = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
@@ -54,11 +55,13 @@ router.put(
 
 // =========================
 // DELETE TICKET
+// ADMIN ONLY
 // =========================
 
 router.delete(
   "/:id",
   authMiddleware,
+  authorizeRoles("Admin"),
   deleteTicket
 );
 

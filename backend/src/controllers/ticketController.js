@@ -1,5 +1,6 @@
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
+const User = require("../models/User");
 
 // =========================
 // CREATE TICKET
@@ -189,6 +190,10 @@ const updateTicket = async (req, res) => {
       engineer,
     } = req.body;
 
+    // =========================
+    // FIND TICKET
+    // =========================
+
     const ticket = await Ticket.findOne({
       ticketId: req.params.id,
     });
@@ -200,18 +205,101 @@ const updateTicket = async (req, res) => {
       });
     }
 
-    // Store old values before update
+    // =========================
+    // FIND CURRENT USER
+    // =========================
+
+    const currentUser = await User.findById(
+      req.user.id
+    ).select("name role status");
+
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Authenticated user not found",
+      });
+    }
+
+    // =========================
+    // ADMIN
+    // =========================
+    // Admin can update any ticket.
+
+    if (currentUser.role === "Admin") {
+      // Admin is allowed to continue.
+    }
+
+    // =========================
+    // ENGINEER
+    // =========================
+
+    else if (currentUser.role === "Engineer") {
+      // Engineer must be assigned to this ticket.
+      if (!ticket.engineer) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You can only update tickets assigned to you",
+        });
+      }
+
+      // Compare logged-in engineer name
+      // with ticket assigned engineer.
+      const isAssignedEngineer =
+        ticket.engineer.trim().toLowerCase() ===
+        currentUser.name.trim().toLowerCase();
+
+      if (!isAssignedEngineer) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You can only update tickets assigned to you",
+        });
+      }
+
+      // Engineer cannot assign/reassign engineer.
+      if (engineer !== undefined) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Engineers are not allowed to assign or reassign tickets",
+        });
+      }
+    }
+
+    // =========================
+    // OTHER ROLES
+    // =========================
+
+    else {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You do not have permission to update this ticket",
+      });
+    }
+
+    // =========================
+    // STORE OLD VALUES
+    // =========================
+
     const oldPriority = ticket.priority;
     const oldStatus = ticket.status;
     const oldEngineer = ticket.engineer;
 
-    // Track whether basic information changed
+    // =========================
+    // TRACK BASIC CHANGES
+    // =========================
+
     const basicFieldsChanged =
       title !== undefined ||
       description !== undefined ||
       category !== undefined;
 
-    // Update fields only if provided
+    // =========================
+    // UPDATE BASIC FIELDS
+    // =========================
+
     if (title !== undefined) {
       ticket.title = title;
     }
@@ -224,17 +312,38 @@ const updateTicket = async (req, res) => {
       ticket.category = category;
     }
 
+    // =========================
+    // UPDATE PRIORITY
+    // =========================
+
     if (priority !== undefined) {
       ticket.priority = priority;
     }
+
+    // =========================
+    // UPDATE STATUS
+    // =========================
 
     if (status !== undefined) {
       ticket.status = status;
     }
 
-    if (engineer !== undefined) {
+    // =========================
+    // UPDATE ENGINEER
+    // =========================
+    // Only Admin reaches this point
+    // with engineer field allowed.
+
+    if (
+      engineer !== undefined &&
+      currentUser.role === "Admin"
+    ) {
       ticket.engineer = engineer;
     }
+
+    // =========================
+    // SAVE TICKET
+    // =========================
 
     await ticket.save();
 
@@ -290,11 +399,12 @@ const updateTicket = async (req, res) => {
     }
 
     // =========================
-    // ENGINEER ASSIGNMENT
+    // ENGINEER ASSIGNMENT ACTIVITY
     // =========================
 
     if (
       engineer !== undefined &&
+      currentUser.role === "Admin" &&
       oldEngineer !== ticket.engineer
     ) {
       await Activity.create({
@@ -304,11 +414,16 @@ const updateTicket = async (req, res) => {
         message: ticket.engineer
           ? `Ticket assigned to ${ticket.engineer}`
           : "Ticket assignment removed",
-        oldValue: oldEngineer || "Unassigned",
+        oldValue:
+          oldEngineer || "Unassigned",
         newValue:
           ticket.engineer || "Unassigned",
       });
     }
+
+    // =========================
+    // RESPONSE
+    // =========================
 
     res.status(200).json({
       success: true,
@@ -359,12 +474,18 @@ const deleteTicket = async (req, res) => {
       newValue: "",
     });
 
-    // Delete ticket
+    // =========================
+    // DELETE TICKET
+    // =========================
+
     await Ticket.deleteOne({
       ticketId: req.params.id,
     });
 
-    // Delete related activities
+    // =========================
+    // DELETE RELATED ACTIVITIES
+    // =========================
+
     await Activity.deleteMany({
       ticket: ticket._id,
     });
@@ -386,6 +507,10 @@ const deleteTicket = async (req, res) => {
     });
   }
 };
+
+// =========================
+// EXPORT
+// =========================
 
 module.exports = {
   createTicket,

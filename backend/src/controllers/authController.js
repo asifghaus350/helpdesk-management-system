@@ -176,14 +176,158 @@ const getMe = async (req, res) => {
         email: user.email,
         role: user.role,
         status: user.status,
+        phone: user.phone,
+        department: user.department,
       },
     });
   } catch (error) {
-    console.error("Get current user error:", error.message);
+    console.error(
+      "Get current user error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
       message: "Server error while fetching user",
+    });
+  }
+};
+
+// =========================
+// CHANGE PASSWORD
+// =========================
+
+const changePassword = async (req, res) => {
+  try {
+    const {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    } = req.body;
+
+    // =========================
+    // VALIDATE FIELDS
+    // =========================
+
+    if (
+      !currentPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Current password, new password and confirm password are required",
+      });
+    }
+
+    // =========================
+    // CHECK NEW PASSWORD
+    // =========================
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password and confirm password do not match",
+      });
+    }
+
+    // =========================
+    // PASSWORD LENGTH
+    // =========================
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be at least 6 characters long",
+      });
+    }
+
+    // =========================
+    // FIND CURRENT USER
+    // =========================
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // =========================
+    // VERIFY CURRENT PASSWORD
+    // =========================
+
+    const isCurrentPasswordValid =
+      await bcrypt.compare(
+        currentPassword,
+        user.password
+      );
+
+    if (!isCurrentPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    // =========================
+    // PREVENT SAME PASSWORD
+    // =========================
+
+    const isSamePassword =
+      await bcrypt.compare(
+        newPassword,
+        user.password
+      );
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be different from current password",
+      });
+    }
+
+    // =========================
+    // HASH NEW PASSWORD
+    // =========================
+
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      10
+    );
+
+    // =========================
+    // SAVE NEW PASSWORD
+    // =========================
+
+    user.password = hashedPassword;
+
+    await user.save();
+
+    // =========================
+    // RESPONSE
+    // =========================
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error(
+      "Change password error:",
+      error.message
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Server error while changing password",
     });
   }
 };
@@ -196,4 +340,5 @@ module.exports = {
   registerUser,
   loginUser,
   getMe,
+  changePassword,
 };
