@@ -1,6 +1,5 @@
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
-const User = require("../models/User");
 
 // =========================
 // CREATE TICKET
@@ -206,35 +205,21 @@ const updateTicket = async (req, res) => {
     }
 
     // =========================
-    // FIND CURRENT USER
+    // CHECK USER ROLE
     // =========================
 
-    const currentUser = await User.findById(
-      req.user.id
-    ).select("name role status");
+    const isAdmin =
+      req.user.role === "Admin";
 
-    if (!currentUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Authenticated user not found",
-      });
-    }
+    const isEngineer =
+      req.user.role === "Engineer";
 
     // =========================
-    // ADMIN
-    // =========================
-    // Admin can update any ticket.
-
-    if (currentUser.role === "Admin") {
-      // Admin is allowed to continue.
-    }
-
-    // =========================
-    // ENGINEER
+    // ENGINEER PERMISSIONS
     // =========================
 
-    else if (currentUser.role === "Engineer") {
-      // Engineer must be assigned to this ticket.
+    if (isEngineer) {
+      // Ticket must have an assigned engineer
       if (!ticket.engineer) {
         return res.status(403).json({
           success: false,
@@ -243,13 +228,22 @@ const updateTicket = async (req, res) => {
         });
       }
 
-      // Compare logged-in engineer name
-      // with ticket assigned engineer.
-      const isAssignedEngineer =
-        ticket.engineer.trim().toLowerCase() ===
-        currentUser.name.trim().toLowerCase();
+      // Current database stores engineer NAME
+      const assignedEngineer =
+        ticket.engineer
+          .trim()
+          .toLowerCase();
 
-      if (!isAssignedEngineer) {
+      const loggedInEngineer =
+        (req.user.name || "")
+          .trim()
+          .toLowerCase();
+
+      // Engineer can update ONLY own assigned ticket
+      if (
+        !loggedInEngineer ||
+        assignedEngineer !== loggedInEngineer
+      ) {
         return res.status(403).json({
           success: false,
           message:
@@ -257,25 +251,25 @@ const updateTicket = async (req, res) => {
         });
       }
 
-      // Engineer cannot assign/reassign engineer.
+      // Engineer cannot assign/reassign ticket
       if (engineer !== undefined) {
         return res.status(403).json({
           success: false,
           message:
-            "Engineers are not allowed to assign or reassign tickets",
+            "Engineers cannot assign or reassign tickets",
         });
       }
     }
 
     // =========================
-    // OTHER ROLES
+    // USER PERMISSION
     // =========================
 
-    else {
+    if (!isAdmin && !isEngineer) {
       return res.status(403).json({
         success: false,
         message:
-          "You do not have permission to update this ticket",
+          "You do not have permission to update tickets",
       });
     }
 
@@ -283,12 +277,17 @@ const updateTicket = async (req, res) => {
     // STORE OLD VALUES
     // =========================
 
-    const oldPriority = ticket.priority;
-    const oldStatus = ticket.status;
-    const oldEngineer = ticket.engineer;
+    const oldPriority =
+      ticket.priority;
+
+    const oldStatus =
+      ticket.status;
+
+    const oldEngineer =
+      ticket.engineer;
 
     // =========================
-    // TRACK BASIC CHANGES
+    // CHECK BASIC CHANGES
     // =========================
 
     const basicFieldsChanged =
@@ -305,7 +304,8 @@ const updateTicket = async (req, res) => {
     }
 
     if (description !== undefined) {
-      ticket.description = description;
+      ticket.description =
+        description;
     }
 
     if (category !== undefined) {
@@ -329,14 +329,13 @@ const updateTicket = async (req, res) => {
     }
 
     // =========================
-    // UPDATE ENGINEER
+    // ADMIN ONLY
+    // ENGINEER ASSIGNMENT
     // =========================
-    // Only Admin reaches this point
-    // with engineer field allowed.
 
     if (
-      engineer !== undefined &&
-      currentUser.role === "Admin"
+      isAdmin &&
+      engineer !== undefined
     ) {
       ticket.engineer = engineer;
     }
@@ -356,7 +355,8 @@ const updateTicket = async (req, res) => {
         ticket: ticket._id,
         user: req.user.id,
         action: "Ticket Updated",
-        message: `Ticket ${ticket.ticketId} information was updated`,
+        message:
+          `Ticket ${ticket.ticketId} information was updated`,
         oldValue: "",
         newValue: "",
       });
@@ -374,7 +374,8 @@ const updateTicket = async (req, res) => {
         ticket: ticket._id,
         user: req.user.id,
         action: "Priority Changed",
-        message: `Priority changed from ${oldPriority} to ${ticket.priority}`,
+        message:
+          `Priority changed from ${oldPriority} to ${ticket.priority}`,
         oldValue: oldPriority,
         newValue: ticket.priority,
       });
@@ -392,7 +393,8 @@ const updateTicket = async (req, res) => {
         ticket: ticket._id,
         user: req.user.id,
         action: "Status Changed",
-        message: `Status changed from ${oldStatus} to ${ticket.status}`,
+        message:
+          `Status changed from ${oldStatus} to ${ticket.status}`,
         oldValue: oldStatus,
         newValue: ticket.status,
       });
@@ -403,8 +405,8 @@ const updateTicket = async (req, res) => {
     // =========================
 
     if (
+      isAdmin &&
       engineer !== undefined &&
-      currentUser.role === "Admin" &&
       oldEngineer !== ticket.engineer
     ) {
       await Activity.create({
@@ -427,7 +429,8 @@ const updateTicket = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Ticket updated successfully",
+      message:
+        "Ticket updated successfully",
       ticket,
     });
   } catch (error) {
@@ -469,30 +472,26 @@ const deleteTicket = async (req, res) => {
       ticket: ticket._id,
       user: req.user.id,
       action: "Ticket Deleted",
-      message: `Ticket ${ticket.ticketId} was deleted`,
+      message:
+        `Ticket ${ticket.ticketId} was deleted`,
       oldValue: ticket.ticketId,
       newValue: "",
     });
 
-    // =========================
-    // DELETE TICKET
-    // =========================
-
+    // Delete ticket
     await Ticket.deleteOne({
       ticketId: req.params.id,
     });
 
-    // =========================
-    // DELETE RELATED ACTIVITIES
-    // =========================
-
+    // Delete related activities
     await Activity.deleteMany({
       ticket: ticket._id,
     });
 
     res.status(200).json({
       success: true,
-      message: "Ticket deleted successfully",
+      message:
+        "Ticket deleted successfully",
     });
   } catch (error) {
     console.error(
