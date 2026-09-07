@@ -1,5 +1,6 @@
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
+const User = require("../models/User");
 
 // =========================
 // CREATE TICKET
@@ -103,14 +104,68 @@ const createTicket = async (req, res) => {
     });
   }
 };
-
 // =========================
 // GET ALL TICKETS
 // =========================
 
 const getTickets = async (req, res) => {
   try {
-    const tickets = await Ticket.find()
+    let filter = {};
+
+    // =========================
+    // ADMIN
+    // =========================
+
+    if (req.user.role === "Admin") {
+      // Admin can see all tickets
+      filter = {};
+    }
+
+    // =========================
+    // ENGINEER
+    // =========================
+
+    if (req.user.role === "Engineer") {
+      const engineer = await User.findById(req.user.id).select("name");
+
+      if (!engineer) {
+        return res.status(404).json({
+          success: false,
+          message: "Engineer account not found",
+        });
+      }
+
+      const engineerName = engineer.name?.trim();
+
+      if (!engineerName) {
+        return res.status(400).json({
+          success: false,
+          message: "Engineer name is missing",
+        });
+      }
+
+      // Engineer can see only tickets assigned to themselves.
+      // Case-insensitive exact name matching prevents
+      // "Musaf" vs "MUSAF" mismatch.
+      filter.engineer = {
+        $regex: `^${engineerName.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        )}$`,
+        $options: "i",
+      };
+    }
+
+    // =========================
+    // USER
+    // =========================
+
+    if (req.user.role === "User") {
+      // User can see only tickets created by themselves
+      filter.createdBy = req.user.id;
+    }
+
+    const tickets = await Ticket.find(filter)
       .populate(
         "createdBy",
         "name email role"
