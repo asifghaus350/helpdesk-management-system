@@ -21,8 +21,7 @@ const createTicket = async (req, res) => {
     if (!title || !description || !category) {
       return res.status(400).json({
         success: false,
-        message:
-          "Title, description and category are required",
+        message: "Title, description and category are required",
       });
     }
 
@@ -86,24 +85,21 @@ const createTicket = async (req, res) => {
       });
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Ticket created successfully",
       ticket,
     });
   } catch (error) {
-    console.error(
-      "Create ticket error:",
-      error.message
-    );
+    console.error("Create ticket error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message:
-        "Server error while creating ticket",
+      message: "Server error while creating ticket",
     });
   }
 };
+
 // =========================
 // GET ALL TICKETS
 // =========================
@@ -145,8 +141,7 @@ const getTickets = async (req, res) => {
       }
 
       // Engineer can see only tickets assigned to themselves.
-      // Case-insensitive exact name matching prevents
-      // "Musaf" vs "MUSAF" mismatch.
+      // Case-insensitive exact name matching.
       filter.engineer = {
         $regex: `^${engineerName.replace(
           /[.*+?^${}()|[\]\\]/g,
@@ -161,32 +156,25 @@ const getTickets = async (req, res) => {
     // =========================
 
     if (req.user.role === "User") {
-      // User can see only tickets created by themselves
+      // User can see only tickets created by themselves.
       filter.createdBy = req.user.id;
     }
 
     const tickets = await Ticket.find(filter)
-      .populate(
-        "createdBy",
-        "name email role"
-      )
+      .populate("createdBy", "name email role")
       .sort({ createdAt: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: tickets.length,
       tickets,
     });
   } catch (error) {
-    console.error(
-      "Get tickets error:",
-      error.message
-    );
+    console.error("Get tickets error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message:
-        "Server error while fetching tickets",
+      message: "Server error while fetching tickets",
     });
   }
 };
@@ -199,11 +187,9 @@ const getTicketById = async (req, res) => {
   try {
     const ticket = await Ticket.findOne({
       ticketId: req.params.id,
-    }).populate(
-      "createdBy",
-      "name email role"
-    );
+    }).populate("createdBy", "name email role");
 
+    // Ticket does not exist
     if (!ticket) {
       return res.status(404).json({
         success: false,
@@ -211,20 +197,101 @@ const getTicketById = async (req, res) => {
       });
     }
 
-    res.status(200).json({
-      success: true,
-      ticket,
-    });
-  } catch (error) {
-    console.error(
-      "Get ticket error:",
-      error.message
-    );
+    // =========================
+    // ADMIN
+    // =========================
 
-    res.status(500).json({
+    if (req.user.role === "Admin") {
+      return res.status(200).json({
+        success: true,
+        ticket,
+      });
+    }
+
+    // =========================
+    // USER
+    // =========================
+
+    if (req.user.role === "User") {
+      const ticketOwnerId =
+        ticket.createdBy?._id?.toString();
+
+      const loggedInUserId =
+        req.user.id?.toString();
+
+      // User can access only own ticket
+      if (
+        !ticketOwnerId ||
+        ticketOwnerId !== loggedInUserId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You do not have permission to access this ticket",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        ticket,
+      });
+    }
+
+    // =========================
+    // ENGINEER
+    // =========================
+
+    if (req.user.role === "Engineer") {
+      const engineer = await User.findById(req.user.id)
+        .select("name");
+
+      if (!engineer) {
+        return res.status(404).json({
+          success: false,
+          message: "Engineer account not found",
+        });
+      }
+
+      const loggedInEngineerName =
+        engineer.name?.trim().toLowerCase();
+
+      const assignedEngineerName =
+        ticket.engineer?.trim().toLowerCase();
+
+      // Engineer can access only assigned ticket
+      if (
+        !loggedInEngineerName ||
+        !assignedEngineerName ||
+        assignedEngineerName !== loggedInEngineerName
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You do not have permission to access this ticket",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        ticket,
+      });
+    }
+
+    // =========================
+    // OTHER ROLES
+    // =========================
+
+    return res.status(403).json({
       success: false,
       message:
-        "Server error while fetching ticket",
+        "You do not have permission to access this ticket",
+    });
+  } catch (error) {
+    console.error("Get ticket error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching ticket",
     });
   }
 };
@@ -260,7 +327,7 @@ const updateTicket = async (req, res) => {
     }
 
     // =========================
-    // CHECK USER ROLE
+    // ROLE FLAGS
     // =========================
 
     const isAdmin =
@@ -268,6 +335,9 @@ const updateTicket = async (req, res) => {
 
     const isEngineer =
       req.user.role === "Engineer";
+
+    const isUser =
+      req.user.role === "User";
 
     // =========================
     // ENGINEER PERMISSIONS
@@ -283,21 +353,30 @@ const updateTicket = async (req, res) => {
         });
       }
 
-      // Current database stores engineer NAME
-      const assignedEngineer =
-        ticket.engineer
-          .trim()
-          .toLowerCase();
-
+      // Fetch logged-in engineer from database.
+      // JWT contains only user ID and role.
       const loggedInEngineer =
-        (req.user.name || "")
+        await User.findById(req.user.id).select("name");
+
+      if (!loggedInEngineer) {
+        return res.status(404).json({
+          success: false,
+          message: "Engineer account not found",
+        });
+      }
+
+      const assignedEngineer =
+        ticket.engineer.trim().toLowerCase();
+
+      const currentEngineer =
+        (loggedInEngineer.name || "")
           .trim()
           .toLowerCase();
 
       // Engineer can update ONLY own assigned ticket
       if (
-        !loggedInEngineer ||
-        assignedEngineer !== loggedInEngineer
+        !currentEngineer ||
+        assignedEngineer !== currentEngineer
       ) {
         return res.status(403).json({
           success: false,
@@ -318,6 +397,18 @@ const updateTicket = async (req, res) => {
 
     // =========================
     // USER PERMISSION
+    // =========================
+
+    if (isUser) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Users do not have permission to update tickets",
+      });
+    }
+
+    // =========================
+    // UNKNOWN ROLE
     // =========================
 
     if (!isAdmin && !isEngineer) {
@@ -359,8 +450,7 @@ const updateTicket = async (req, res) => {
     }
 
     if (description !== undefined) {
-      ticket.description =
-        description;
+      ticket.description = description;
     }
 
     if (category !== undefined) {
@@ -482,22 +572,17 @@ const updateTicket = async (req, res) => {
     // RESPONSE
     // =========================
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message:
-        "Ticket updated successfully",
+      message: "Ticket updated successfully",
       ticket,
     });
   } catch (error) {
-    console.error(
-      "Update ticket error:",
-      error.message
-    );
+    console.error("Update ticket error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message:
-        "Server error while updating ticket",
+      message: "Server error while updating ticket",
     });
   }
 };
@@ -508,6 +593,18 @@ const updateTicket = async (req, res) => {
 
 const deleteTicket = async (req, res) => {
   try {
+    // =========================
+    // ADMIN ONLY
+    // =========================
+
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Only Admin can delete tickets",
+      });
+    }
+
     const ticket = await Ticket.findOne({
       ticketId: req.params.id,
     });
@@ -520,44 +617,35 @@ const deleteTicket = async (req, res) => {
     }
 
     // =========================
-    // LOG DELETE ACTIVITY
+    // DELETE TICKET
     // =========================
 
-    await Activity.create({
-      ticket: ticket._id,
-      user: req.user.id,
-      action: "Ticket Deleted",
-      message:
-        `Ticket ${ticket.ticketId} was deleted`,
-      oldValue: ticket.ticketId,
-      newValue: "",
-    });
-
-    // Delete ticket
     await Ticket.deleteOne({
       ticketId: req.params.id,
     });
 
-    // Delete related activities
+    // =========================
+    // DELETE RELATED ACTIVITIES
+    // =========================
+
     await Activity.deleteMany({
       ticket: ticket._id,
     });
 
-    res.status(200).json({
+    // =========================
+    // RESPONSE
+    // =========================
+
+    return res.status(200).json({
       success: true,
-      message:
-        "Ticket deleted successfully",
+      message: "Ticket deleted successfully",
     });
   } catch (error) {
-    console.error(
-      "Delete ticket error:",
-      error.message
-    );
+    console.error("Delete ticket error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message:
-        "Server error while deleting ticket",
+      message: "Server error while deleting ticket",
     });
   }
 };

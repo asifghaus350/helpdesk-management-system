@@ -22,6 +22,52 @@ function Dashboard() {
   const [error, setError] = useState("");
 
   // =========================
+  // GET CURRENT USER
+  // =========================
+
+ const storedUser = localStorage.getItem("user");
+
+let userRole = "User";
+
+try {
+  const parsedUser = storedUser
+    ? JSON.parse(storedUser)
+    : null;
+
+  userRole = parsedUser?.role || "User";
+} catch (error) {
+  console.error("User data parse error:", error);
+}
+
+  // =========================
+  // ROLE BASED CONTENT
+  // =========================
+
+  const dashboardContent = {
+    Admin: {
+      label: "System Overview",
+      description:
+        "Monitor and manage all support tickets across the system.",
+    },
+
+    Engineer: {
+      label: "My Assigned Tickets",
+      description:
+        "Monitor tickets currently assigned to you and track their progress.",
+    },
+
+    User: {
+      label: "My Tickets",
+      description:
+        "Track the support tickets you have created and their current status.",
+    },
+  };
+
+  const roleContent =
+    dashboardContent[userRole] ||
+    dashboardContent.User;
+
+  // =========================
   // FETCH TICKETS
   // =========================
 
@@ -143,10 +189,15 @@ function Dashboard() {
     );
   }
 
+  // =========================
+  // DASHBOARD
+  // =========================
+
   return (
     <Layout>
-
-      {/* Error */}
+      {/* =========================
+          ERROR
+      ========================= */}
 
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
@@ -154,14 +205,14 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Dashboard Header */}
+      {/* =========================
+          DASHBOARD HEADER
+      ========================= */}
 
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
-
         <div>
-
           <p className="text-sm font-medium text-blue-600 mb-2">
-            Overview
+            {roleContent.label}
           </p>
 
           <h1 className="text-3xl font-bold tracking-tight text-slate-800">
@@ -169,24 +220,25 @@ function Dashboard() {
           </h1>
 
           <p className="text-slate-500 mt-2">
-            Here's what's happening with your support tickets today.
+            {roleContent.description}
           </p>
-
         </div>
 
         <div className="text-sm text-slate-500">
-          Total tickets:{" "}
+          {userRole === "Admin"
+            ? "Total system tickets:"
+            : "Your tickets:"}{" "}
           <span className="font-semibold text-slate-700">
             {totalTickets}
           </span>
         </div>
-
       </div>
 
-      {/* Statistics Cards */}
+      {/* =========================
+          STATISTICS CARDS
+      ========================= */}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-
         {cards.map((card, index) => (
           <DashboardCard
             key={index}
@@ -197,29 +249,29 @@ function Dashboard() {
             iconColor={card.iconColor}
           />
         ))}
-
       </div>
 
-      {/* Main Dashboard Content */}
+      {/* =========================
+          MAIN DASHBOARD CONTENT
+      ========================= */}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
-
-        {/* Recent Tickets */}
+        {/* =========================
+            RECENT TICKETS
+        ========================= */}
 
         <div className="xl:col-span-2 bg-white border border-slate-200 rounded-2xl overflow-hidden">
-
           <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-
             <div>
-
               <h2 className="text-lg font-semibold text-slate-800">
                 Recent Tickets
               </h2>
 
               <p className="text-sm text-slate-500 mt-1">
-                Latest support activity
+                {userRole === "Admin"
+                  ? "Latest support activity across the system"
+                  : "Latest activity from your tickets"}
               </p>
-
             </div>
 
             <button
@@ -230,21 +282,19 @@ function Dashboard() {
               View all
               <ArrowUpRight size={16} />
             </button>
-
           </div>
 
           <div className="p-6">
             <RecentTickets tickets={tickets} />
           </div>
-
         </div>
 
-        {/* Ticket Overview */}
+        {/* =========================
+            TICKET OVERVIEW
+        ========================= */}
 
         <div className="bg-white border border-slate-200 rounded-2xl p-6">
-
           <div className="mb-6">
-
             <h2 className="text-lg font-semibold text-slate-800">
               Ticket Overview
             </h2>
@@ -252,19 +302,13 @@ function Dashboard() {
             <p className="text-sm text-slate-500 mt-1">
               Current ticket distribution
             </p>
-
           </div>
 
-          {/* Overview */}
-
           <div className="space-y-5">
-
-            {/* Open */}
+            {/* OPEN */}
 
             <div>
-
               <div className="flex items-center justify-between mb-2">
-
                 <span className="text-sm text-slate-600">
                   Open
                 </span>
@@ -272,11 +316,9 @@ function Dashboard() {
                 <span className="text-sm font-semibold text-slate-800">
                   {openTickets}
                 </span>
-
               </div>
 
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-
                 <div
                   className="h-full bg-red-500 rounded-full"
                   style={{
@@ -289,17 +331,13 @@ function Dashboard() {
                     }%`,
                   }}
                 />
-
               </div>
-
             </div>
 
-            {/* In Progress */}
+            {/* IN PROGRESS */}
 
             <div>
-
               <div className="flex items-center justify-between mb-2">
-
                 <span className="text-sm text-slate-600">
                   In Progress
                 </span>
@@ -307,11 +345,9 @@ function Dashboard() {
                 <span className="text-sm font-semibold text-slate-800">
                   {inProgressTickets}
                 </span>
-
               </div>
 
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-
                 <div
                   className="h-full bg-amber-500 rounded-full"
                   style={{
@@ -324,17 +360,13 @@ function Dashboard() {
                     }%`,
                   }}
                 />
-
               </div>
-
             </div>
 
-            {/* Closed */}
+            {/* CLOSED */}
 
             <div>
-
               <div className="flex items-center justify-between mb-2">
-
                 <span className="text-sm text-slate-600">
                   Closed
                 </span>
@@ -342,11 +374,9 @@ function Dashboard() {
                 <span className="text-sm font-semibold text-slate-800">
                   {closedTickets}
                 </span>
-
               </div>
 
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-
                 <div
                   className="h-full bg-emerald-500 rounded-full"
                   style={{
@@ -359,19 +389,16 @@ function Dashboard() {
                     }%`,
                   }}
                 />
-
               </div>
-
             </div>
-
           </div>
 
-          {/* Summary */}
+          {/* =========================
+              RESOLUTION RATE
+          ========================= */}
 
           <div className="mt-8 pt-6 border-t border-slate-100">
-
             <div className="flex items-center justify-between">
-
               <span className="text-sm text-slate-500">
                 Resolution rate
               </span>
@@ -386,25 +413,22 @@ function Dashboard() {
                   : 0}
                 %
               </span>
-
             </div>
 
             <p className="text-xs text-slate-400 mt-2">
               Based on currently available tickets
             </p>
-
           </div>
-
         </div>
-
       </div>
 
-      {/* Quick Actions */}
+      {/* =========================
+          QUICK ACTIONS
+      ========================= */}
 
       <div className="mt-6">
         <QuickActions />
       </div>
-
     </Layout>
   );
 }
