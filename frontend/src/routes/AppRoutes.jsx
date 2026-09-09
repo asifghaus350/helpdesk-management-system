@@ -12,6 +12,8 @@ import NotFound from "../pages/NotFound";
 import Settings from "../pages/Settings";
 import Reports from "../pages/Reports";
 import AccessDenied from "../pages/AccessDenied";
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
 
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 
@@ -91,6 +93,21 @@ function AppRoutes() {
           />
 
         </Route>
+
+        {/*=========================
+        forgot Password Route
+        =========================*/}
+
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/*=========================
+        reset Password Route
+        =========================*/}
+        <Route
+  path="/reset-password/:token"
+  element={<ResetPassword />}
+/>
+
 
         {/* =========================
             ADMIN ONLY ROUTES

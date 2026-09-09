@@ -150,31 +150,43 @@ function Login() {
 
             {/* Password */}
 
-            <div className="mb-6">
+            {/* Password */}
 
-              <label className="font-medium">
-                Password
-              </label>
+<div className="mb-6">
 
-              <div className="relative mt-2">
+  <div className="flex items-center justify-between">
+    <label className="font-medium">
+      Password
+    </label>
 
-                <Lock
-                  size={20}
-                  className="absolute left-4 top-3 text-gray-400"
-                />
+    <button
+      type="button"
+      onClick={() => navigate("/forgot-password")}
+      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
+    >
+      Forgot Password?
+    </button>
+  </div>
 
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  autoComplete="current-password"
-                  className="w-full border rounded-xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
-                />
+  <div className="relative mt-2">
 
-              </div>
+    <Lock
+      size={20}
+      className="absolute left-4 top-3 text-gray-400"
+    />
 
-            </div>
+    <input
+      type="password"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      placeholder="Enter password"
+      autoComplete="current-password"
+      className="w-full border rounded-xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
+    />
+
+  </div>
+
+</div>
 
             {/* Login Button */}
 

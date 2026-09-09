@@ -1,17 +1,14 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const User = require("../models/User");
 
-// =========================
 // REGISTER USER
-// =========================
-
 const registerUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validate required fields
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -19,7 +16,6 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Check existing user
     const existingUser = await User.findOne({
       email: email.toLowerCase(),
     });
@@ -31,10 +27,8 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const user = await User.create({
       name,
       email: email.toLowerCase(),
@@ -42,7 +36,6 @@ const registerUser = async (req, res) => {
       role: role || "User",
     });
 
-    // Remove password from response
     const userResponse = {
       id: user._id,
       name: user.name,
@@ -66,15 +59,11 @@ const registerUser = async (req, res) => {
   }
 };
 
-// =========================
 // LOGIN USER
-// =========================
-
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate fields
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -82,7 +71,6 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Find user
     const user = await User.findOne({
       email: email.toLowerCase(),
     });
@@ -94,7 +82,6 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Check account status
     if (user.status !== "Active") {
       return res.status(403).json({
         success: false,
@@ -102,7 +89,6 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Compare password
     const isPasswordValid = await bcrypt.compare(
       password,
       user.password
@@ -115,7 +101,6 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Create JWT
     const token = jwt.sign(
       {
         id: user._id,
@@ -127,7 +112,6 @@ const loginUser = async (req, res) => {
       }
     );
 
-    // User response
     const userResponse = {
       id: user._id,
       name: user.name,
@@ -152,10 +136,7 @@ const loginUser = async (req, res) => {
   }
 };
 
-// =========================
 // GET CURRENT USER
-// =========================
-
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -181,10 +162,7 @@ const getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(
-      "Get current user error:",
-      error.message
-    );
+    console.error("Get current user error:", error.message);
 
     res.status(500).json({
       success: false,
@@ -193,10 +171,7 @@ const getMe = async (req, res) => {
   }
 };
 
-// =========================
 // CHANGE PASSWORD
-// =========================
-
 const changePassword = async (req, res) => {
   try {
     const {
@@ -204,10 +179,6 @@ const changePassword = async (req, res) => {
       newPassword,
       confirmPassword,
     } = req.body;
-
-    // =========================
-    // VALIDATE FIELDS
-    // =========================
 
     if (
       !currentPassword ||
@@ -221,10 +192,6 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // =========================
-    // CHECK NEW PASSWORD
-    // =========================
-
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -233,10 +200,6 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // =========================
-    // PASSWORD LENGTH
-    // =========================
-
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
@@ -244,10 +207,6 @@ const changePassword = async (req, res) => {
           "New password must be at least 6 characters long",
       });
     }
-
-    // =========================
-    // FIND CURRENT USER
-    // =========================
 
     const user = await User.findById(req.user.id);
 
@@ -258,15 +217,10 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // =========================
-    // VERIFY CURRENT PASSWORD
-    // =========================
-
-    const isCurrentPasswordValid =
-      await bcrypt.compare(
-        currentPassword,
-        user.password
-      );
+    const isCurrentPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
 
     if (!isCurrentPasswordValid) {
       return res.status(401).json({
@@ -275,15 +229,10 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // =========================
-    // PREVENT SAME PASSWORD
-    // =========================
-
-    const isSamePassword =
-      await bcrypt.compare(
-        newPassword,
-        user.password
-      );
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      user.password
+    );
 
     if (isSamePassword) {
       return res.status(400).json({
@@ -293,36 +242,21 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // =========================
-    // HASH NEW PASSWORD
-    // =========================
-
     const hashedPassword = await bcrypt.hash(
       newPassword,
       10
     );
 
-    // =========================
-    // SAVE NEW PASSWORD
-    // =========================
-
     user.password = hashedPassword;
 
     await user.save();
-
-    // =========================
-    // RESPONSE
-    // =========================
 
     res.status(200).json({
       success: true,
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error(
-      "Change password error:",
-      error.message
-    );
+    console.error("Change password error:", error.message);
 
     res.status(500).json({
       success: false,
@@ -332,13 +266,180 @@ const changePassword = async (req, res) => {
   }
 };
 
-// =========================
-// EXPORT
-// =========================
+// FORGOT PASSWORD
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    // Do not reveal whether an email exists.
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "If an account exists with this email, a password reset link has been generated.",
+      });
+    }
+
+    // Generate secure random token.
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // Store only the hash in database.
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    user.resetPasswordToken = hashedResetToken;
+
+    // Token expires after 15 minutes.
+    user.resetPasswordExpires = new Date(
+      Date.now() + 15 * 60 * 1000
+    );
+
+    await user.save();
+
+    // Development reset URL.
+    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password/${resetToken}`;
+
+    // Temporary development logging.
+    // In production this URL should be sent through email.
+    console.log("Password reset URL:", resetUrl);
+
+    res.status(200).json({
+      success: true,
+      message:
+        "If an account exists with this email, a password reset link has been generated.",
+      resetUrl,
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Server error while processing password reset request",
+    });
+  }
+};
+
+// RESET PASSWORD
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset token is required",
+      });
+    }
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password and confirm password are required",
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password and confirm password do not match",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be at least 6 characters long",
+      });
+    }
+
+    // Hash the received token and compare with database.
+    const hashedResetToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedResetToken,
+      resetPasswordExpires: {
+        $gt: new Date(),
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid or expired password reset token",
+      });
+    }
+
+    // Prevent using the same password.
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      user.password
+    );
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be different from current password",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      10
+    );
+
+    user.password = hashedPassword;
+
+    // Invalidate reset token after successful reset.
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Server error while resetting password",
+    });
+  }
+};
 
 module.exports = {
   registerUser,
   loginUser,
   getMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
 };
