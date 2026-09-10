@@ -940,23 +940,19 @@ function Profile() {
 
           </div>
 
-          {/* FORGOT PASSWORD */}
+         {/* FORGOT PASSWORD */}
 
-          <div className="text-sm">
+<div className="text-sm">
 
-            <button
-              type="button"
-              className="text-blue-600 hover:text-blue-700 font-medium"
-              onClick={() => {
-                alert(
-                  "Forgot password functionality will be added in the next step."
-                );
-              }}
-            >
-              Forgot Password?
-            </button>
+  <button
+    type="button"
+    className="text-blue-600 hover:text-blue-700 font-medium"
+    onClick={() => navigate("/forgot-password")}
+  >
+    Forgot Password?
+  </button>
 
-          </div>
+</div>
 
           {/* CHANGE PASSWORD BUTTON */}
 
