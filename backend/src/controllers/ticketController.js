@@ -465,13 +465,27 @@ const updateTicket = async (req, res) => {
       ticket.priority = priority;
     }
 
-    // =========================
-    // UPDATE STATUS
-    // =========================
+   // =========================
+// UPDATE STATUS
+// =========================
 
-    if (status !== undefined) {
-      ticket.status = status;
-    }
+if (status !== undefined) {
+  const allowedStatuses = [
+    "Open",
+    "In Progress",
+    "Closed",
+  ];
+
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Invalid status. Allowed statuses are Open, In Progress and Closed.",
+    });
+  }
+
+  ticket.status = status;
+}
 
     // =========================
     // ADMIN ONLY
@@ -593,20 +607,19 @@ const updateTicket = async (req, res) => {
 
 const deleteTicket = async (req, res) => {
   try {
-    // =========================
-    // ADMIN ONLY
-    // =========================
-
+    // Only Admin can delete tickets
     if (req.user.role !== "Admin") {
       return res.status(403).json({
         success: false,
         message:
-          "Only Admin can delete tickets",
+          "Only Admin can delete tickets.",
       });
     }
 
+    const { id } = req.params;
+
     const ticket = await Ticket.findOne({
-      ticketId: req.params.id,
+      ticketId: id,
     });
 
     if (!ticket) {
@@ -616,39 +629,53 @@ const deleteTicket = async (req, res) => {
       });
     }
 
-    // =========================
-    // DELETE TICKET
-    // =========================
+    // Get deleting user's information
+    const deletingUser = await User.findById(
+      req.user.id
+    ).select("name email role");
 
-    await Ticket.deleteOne({
-      ticketId: req.params.id,
-    });
+    if (!deletingUser) {
+      return res.status(401).json({
+        success: false,
+        message: "User account not found.",
+      });
+    }
 
-    // =========================
-    // DELETE RELATED ACTIVITIES
-    // =========================
-
-    await Activity.deleteMany({
+    // Create permanent deletion audit record
+    await Activity.create({
       ticket: ticket._id,
+      user: deletingUser._id,
+      action: "Ticket Deleted",
+      message: `Ticket ${ticket.ticketId} was deleted by ${deletingUser.name}.`,
+      oldValue: ticket.status,
+      newValue: "Deleted",
     });
 
-    // =========================
-    // RESPONSE
-    // =========================
+    // Delete the ticket itself
+    await Ticket.findByIdAndDelete(ticket._id);
+
+    // IMPORTANT:
+    // Do NOT delete the ticket's activities.
+    // Activity history is the audit trail and must remain preserved.
 
     return res.status(200).json({
       success: true,
       message: "Ticket deleted successfully",
     });
   } catch (error) {
-    console.error("Delete ticket error:", error.message);
+    console.error(
+      "Delete ticket error:",
+      error.message
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Server error while deleting ticket",
+      message:
+        "Server error while deleting ticket",
     });
   }
 };
+    
 
 // =========================
 // EXPORT

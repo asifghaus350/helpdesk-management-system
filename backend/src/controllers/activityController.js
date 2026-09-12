@@ -1,5 +1,44 @@
 const Activity = require("../models/Activity");
 const Ticket = require("../models/Ticket");
+const User = require("../models/User");
+
+// =========================
+// CHECK TICKET ACCESS
+// =========================
+
+const checkTicketAccess = async (ticket, user) => {
+  // ADMIN
+  if (user.role === "Admin") {
+    return true;
+  }
+
+  // USER
+  if (user.role === "User") {
+    return (
+      ticket.createdBy &&
+      ticket.createdBy.toString() === user.id.toString()
+    );
+  }
+
+  // ENGINEER
+  if (user.role === "Engineer") {
+    const currentUser = await User.findById(user.id).select(
+      "name role"
+    );
+
+    if (!currentUser) {
+      return false;
+    }
+
+    return (
+      ticket.engineer &&
+      ticket.engineer.trim().toLowerCase() ===
+        currentUser.name.trim().toLowerCase()
+    );
+  }
+
+  return false;
+};
 
 // =========================
 // GET TICKET ACTIVITIES
@@ -8,10 +47,6 @@ const Ticket = require("../models/Ticket");
 const getTicketActivities = async (req, res) => {
   try {
     const { ticketId } = req.params;
-
-    // =========================
-    // FIND TICKET BY TICKET ID
-    // =========================
 
     const ticket = await Ticket.findOne({
       ticketId: ticketId,
@@ -24,20 +59,26 @@ const getTicketActivities = async (req, res) => {
       });
     }
 
-    // =========================
-    // FIND ACTIVITIES
-    // =========================
+    const hasAccess = await checkTicketAccess(
+      ticket,
+      req.user
+    );
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You are not authorized to view this ticket activity.",
+      });
+    }
 
     const activities = await Activity.find({
       ticket: ticket._id,
     })
-      .populate(
-        "user",
-        "name email role"
-      )
+      .populate("user", "name email role")
       .sort({ createdAt: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: activities.length,
       activities,
@@ -48,7 +89,7 @@ const getTicketActivities = async (req, res) => {
       error.message
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message:
         "Server error while fetching ticket activities",
@@ -70,10 +111,6 @@ const createActivity = async (req, res) => {
       newValue,
     } = req.body;
 
-    // =========================
-    // VALIDATION
-    // =========================
-
     if (!ticket || !action || !message) {
       return res.status(400).json({
         success: false,
@@ -81,10 +118,6 @@ const createActivity = async (req, res) => {
           "Ticket, action and message are required",
       });
     }
-
-    // =========================
-    // VERIFY TICKET
-    // =========================
 
     const existingTicket =
       await Ticket.findById(ticket);
@@ -96,9 +129,37 @@ const createActivity = async (req, res) => {
       });
     }
 
-    // =========================
-    // CREATE ACTIVITY
-    // =========================
+    const hasAccess = await checkTicketAccess(
+      existingTicket,
+      req.user
+    );
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You are not authorized to create activity for this ticket.",
+      });
+    }
+
+    const allowedActions = [
+      "Ticket Created",
+      "Ticket Updated",
+      "Ticket Assigned",
+      "Priority Changed",
+      "Status Changed",
+      "Comment Added",
+      "Comment Updated",
+      "Comment Deleted",
+      "Ticket Deleted",
+    ];
+
+    if (!allowedActions.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid activity action.",
+      });
+    }
 
     const activity = await Activity.create({
       ticket: existingTicket._id,
@@ -109,16 +170,12 @@ const createActivity = async (req, res) => {
       newValue: newValue || "",
     });
 
-    // =========================
-    // POPULATE USER
-    // =========================
-
     await activity.populate(
       "user",
       "name email role"
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Activity created successfully",
       activity,
@@ -129,7 +186,7 @@ const createActivity = async (req, res) => {
       error.message
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message:
         "Server error while creating activity",
@@ -148,9 +205,14 @@ const deleteTicketActivities = async (
   try {
     const { ticketId } = req.params;
 
-    // =========================
-    // FIND TICKET
-    // =========================
+    // Only Admin can delete audit history
+    if (req.user.role !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Only Admin can delete ticket activities.",
+      });
+    }
 
     const ticket = await Ticket.findOne({
       ticketId: ticketId,
@@ -163,15 +225,11 @@ const deleteTicketActivities = async (
       });
     }
 
-    // =========================
-    // DELETE ACTIVITIES
-    // =========================
-
     await Activity.deleteMany({
       ticket: ticket._id,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message:
         "Ticket activities deleted successfully",
@@ -182,7 +240,7 @@ const deleteTicketActivities = async (
       error.message
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message:
         "Server error while deleting ticket activities",
