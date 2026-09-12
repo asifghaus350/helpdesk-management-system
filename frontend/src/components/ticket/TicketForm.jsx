@@ -7,6 +7,26 @@ function TicketForm({ mode = "create" }) {
   const { id } = useParams();
 
   // =========================
+  // CURRENT USER / ROLE
+  // =========================
+
+  const storedUser = localStorage.getItem("user");
+
+  let currentUser = null;
+
+  try {
+    currentUser = storedUser ? JSON.parse(storedUser) : null;
+  } catch (error) {
+    console.error("User parse error:", error);
+  }
+
+  const userRole = currentUser?.role || "";
+
+  const isAdmin = userRole === "Admin";
+  const isEngineer = userRole === "Engineer";
+  const isUser = userRole === "User";
+
+  // =========================
   // FORM DATA
   // =========================
 
@@ -24,8 +44,7 @@ function TicketForm({ mode = "create" }) {
   // =========================
 
   const [engineers, setEngineers] = useState([]);
-  const [loadingEngineers, setLoadingEngineers] =
-    useState(true);
+  const [loadingEngineers, setLoadingEngineers] = useState(false);
 
   // =========================
   // LOADING / ERROR
@@ -41,9 +60,15 @@ function TicketForm({ mode = "create" }) {
 
   // =========================
   // FETCH ACTIVE ENGINEERS
+  // ADMIN ONLY
   // =========================
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLoadingEngineers(false);
+      return;
+    }
+
     const fetchEngineers = async () => {
       try {
         setLoadingEngineers(true);
@@ -70,14 +95,11 @@ function TicketForm({ mode = "create" }) {
 
         if (!response.ok) {
           throw new Error(
-            data.message ||
-              "Failed to fetch engineers"
+            data.message || "Failed to fetch engineers"
           );
         }
 
-        const activeEngineers = (
-          data.users || []
-        ).filter(
+        const activeEngineers = (data.users || []).filter(
           (user) =>
             user.role === "Engineer" &&
             user.status === "Active"
@@ -100,7 +122,7 @@ function TicketForm({ mode = "create" }) {
     };
 
     fetchEngineers();
-  }, [navigate]);
+  }, [isAdmin, navigate]);
 
   // =========================
   // FETCH TICKET FOR EDIT
@@ -200,11 +222,19 @@ function TicketForm({ mode = "create" }) {
       !formData.title ||
       !formData.category ||
       !formData.priority ||
-      !formData.engineer ||
       !formData.description
     ) {
       setError(
         "Please fill all required fields."
+      );
+
+      return;
+    }
+
+    // Engineer assignment is required only for Admin
+    if (isAdmin && !formData.engineer) {
+      setError(
+        "Please assign an Engineer to this ticket."
       );
 
       return;
@@ -225,6 +255,19 @@ function TicketForm({ mode = "create" }) {
       // =========================
 
       if (mode === "create") {
+        const createBody = {
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          status: formData.status,
+        };
+
+        // Only Admin can assign an engineer
+        if (isAdmin) {
+          createBody.engineer = formData.engineer;
+        }
+
         const response = await fetch(
           "http://localhost:5000/api/tickets",
           {
@@ -235,14 +278,7 @@ function TicketForm({ mode = "create" }) {
               Authorization: `Bearer ${token}`,
             },
 
-            body: JSON.stringify({
-              title: formData.title,
-              description: formData.description,
-              category: formData.category,
-              priority: formData.priority,
-              status: formData.status,
-              engineer: formData.engineer,
-            }),
+            body: JSON.stringify(createBody),
           }
         );
 
@@ -275,6 +311,19 @@ function TicketForm({ mode = "create" }) {
       // =========================
 
       if (mode === "edit") {
+        const updateBody = {
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          status: formData.status,
+        };
+
+        // Only Admin can assign/reassign engineer
+        if (isAdmin) {
+          updateBody.engineer = formData.engineer;
+        }
+
         const response = await fetch(
           `http://localhost:5000/api/tickets/${id}`,
           {
@@ -285,14 +334,7 @@ function TicketForm({ mode = "create" }) {
               Authorization: `Bearer ${token}`,
             },
 
-            body: JSON.stringify({
-              title: formData.title,
-              description: formData.description,
-              category: formData.category,
-              priority: formData.priority,
-              status: formData.status,
-              engineer: formData.engineer,
-            }),
+            body: JSON.stringify(updateBody),
           }
         );
 
@@ -346,7 +388,6 @@ function TicketForm({ mode = "create" }) {
 
   return (
     <form onSubmit={handleSubmit}>
-
       <div className="bg-white rounded-2xl shadow-md p-8">
 
         {/* =========================
@@ -370,7 +411,6 @@ function TicketForm({ mode = "create" }) {
           ========================= */}
 
           <div>
-
             <label className="block font-medium mb-2">
               Ticket Title *
             </label>
@@ -383,7 +423,6 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             />
-
           </div>
 
           {/* =========================
@@ -391,7 +430,6 @@ function TicketForm({ mode = "create" }) {
           ========================= */}
 
           <div>
-
             <label className="block font-medium mb-2">
               Category *
             </label>
@@ -402,7 +440,6 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             >
-
               <option value="">
                 Select Category
               </option>
@@ -418,9 +455,7 @@ function TicketForm({ mode = "create" }) {
               <option value="Support">
                 Support
               </option>
-
             </select>
-
           </div>
 
           {/* =========================
@@ -428,7 +463,6 @@ function TicketForm({ mode = "create" }) {
           ========================= */}
 
           <div>
-
             <label className="block font-medium mb-2">
               Priority *
             </label>
@@ -439,7 +473,6 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             >
-
               <option value="">
                 Select Priority
               </option>
@@ -455,9 +488,7 @@ function TicketForm({ mode = "create" }) {
               <option value="Low">
                 Low
               </option>
-
             </select>
-
           </div>
 
           {/* =========================
@@ -465,7 +496,6 @@ function TicketForm({ mode = "create" }) {
           ========================= */}
 
           <div>
-
             <label className="block font-medium mb-2">
               Status *
             </label>
@@ -476,7 +506,6 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
             >
-
               <option value="Open">
                 Open
               </option>
@@ -488,37 +517,34 @@ function TicketForm({ mode = "create" }) {
               <option value="Closed">
                 Closed
               </option>
-
             </select>
-
           </div>
 
           {/* =========================
               ENGINEER
+              ADMIN ONLY
           ========================= */}
 
-          <div className="md:col-span-2">
+          {isAdmin && (
+            <div className="md:col-span-2">
+              <label className="block font-medium mb-2">
+                Assign Engineer *
+              </label>
 
-            <label className="block font-medium mb-2">
-              Assign Engineer *
-            </label>
+              <select
+                name="engineer"
+                value={formData.engineer}
+                onChange={handleChange}
+                disabled={loadingEngineers}
+                className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {loadingEngineers
+                    ? "Loading Engineers..."
+                    : "Select Engineer"}
+                </option>
 
-            <select
-              name="engineer"
-              value={formData.engineer}
-              onChange={handleChange}
-              disabled={loadingEngineers}
-              className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-
-              <option value="">
-                {loadingEngineers
-                  ? "Loading Engineers..."
-                  : "Select Engineer"}
-              </option>
-
-              {engineers.map(
-                (engineer) => (
+                {engineers.map((engineer) => (
                   <option
                     key={
                       engineer._id ||
@@ -528,28 +554,58 @@ function TicketForm({ mode = "create" }) {
                   >
                     {engineer.name}
                   </option>
-                )
-              )}
+                ))}
+              </select>
 
-            </select>
+              {!loadingEngineers &&
+                engineers.length === 0 && (
+                  <p className="text-sm text-red-500 mt-2">
+                    No active engineers available.
+                    Please add an active Engineer
+                    from User Management.
+                  </p>
+                )}
 
-            {!loadingEngineers &&
-              engineers.length === 0 && (
-                <p className="text-sm text-red-500 mt-2">
-                  No active engineers available.
-                  Please add an active Engineer
-                  from User Management.
+              {mode === "edit" &&
+                formData.engineer && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Current assignment:{" "}
+                    <span className="font-medium text-slate-700">
+                      {formData.engineer}
+                    </span>
+                  </p>
+                )}
+            </div>
+          )}
+
+          {/* =========================
+              ENGINEER VIEW
+              READ-ONLY ASSIGNMENT INFO
+          ========================= */}
+
+          {mode === "edit" &&
+            isEngineer &&
+            formData.engineer && (
+              <div className="md:col-span-2">
+                <label className="block font-medium mb-2">
+                  Assigned Engineer
+                </label>
+
+                <div className="w-full border rounded-xl px-4 py-3 bg-gray-50 text-gray-700">
+                  {formData.engineer}
+                </div>
+
+                <p className="text-sm text-gray-500 mt-2">
+                  Engineer assignment can only be changed by an Admin.
                 </p>
-              )}
-
-          </div>
+              </div>
+            )}
 
           {/* =========================
               DESCRIPTION
           ========================= */}
 
           <div className="md:col-span-2">
-
             <label className="block font-medium mb-2">
               Description *
             </label>
@@ -562,9 +618,7 @@ function TicketForm({ mode = "create" }) {
               onChange={handleChange}
               className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             />
-
           </div>
-
         </div>
 
         {/* =========================
@@ -591,7 +645,6 @@ function TicketForm({ mode = "create" }) {
             }
             className="px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
-
             {loading
               ? mode === "edit"
                 ? "Updating..."
@@ -599,13 +652,10 @@ function TicketForm({ mode = "create" }) {
               : mode === "edit"
               ? "Update Ticket"
               : "Create Ticket"}
-
           </button>
 
         </div>
-
       </div>
-
     </form>
   );
 }
