@@ -24,7 +24,7 @@ function TicketForm({ mode = "create" }) {
 
   const isAdmin = userRole === "Admin";
   const isEngineer = userRole === "Engineer";
-  const isUser = userRole === "User";
+
 
   // =========================
   // FORM DATA
@@ -63,13 +63,12 @@ function TicketForm({ mode = "create" }) {
   // ADMIN ONLY
   // =========================
 
-  useEffect(() => {
-    if (!isAdmin) {
-      setLoadingEngineers(false);
-      return;
-    }
+ useEffect(() => {
+  if (!isAdmin) {
+    return;
+  }
 
-    const fetchEngineers = async () => {
+  const fetchEngineers = async () => {
       try {
         setLoadingEngineers(true);
         setError("");

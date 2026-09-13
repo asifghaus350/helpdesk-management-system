@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Mail, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import { auth } from "../firebase";
 
 function Login() {
   const navigate = useNavigate();
@@ -11,6 +16,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Existing Email/Password Login
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -56,15 +62,44 @@ function Login() {
         JSON.stringify(data.user)
       );
 
+      // Notify other components about user change
+      window.dispatchEvent(new Event("userChanged"));
+
       // Redirect to dashboard
       navigate("/dashboard");
-
     } catch (error) {
       console.error("Login error:", error);
 
       setError(
         error.message ||
-        "Unable to login. Please try again."
+          "Unable to login. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google Login
+  const handleGoogleLogin = async () => {
+    try {
+      setError("");
+      setLoading(true);
+
+      const provider = new GoogleAuthProvider();
+
+      const result = await signInWithPopup(
+        auth,
+        provider
+      );
+
+      console.log("Google user:", result.user);
+
+    } catch (error) {
+      console.error("Google login error:", error);
+
+      setError(
+        error.message ||
+          "Unable to login with Google. Please try again."
       );
     } finally {
       setLoading(false);
@@ -100,7 +135,7 @@ function Login() {
 
       <div className="flex-1 flex items-center justify-center">
 
-        <div className="bg-white shadow-xl rounded-3xl w-[450px] p-10">
+        <div className="bg-white shadow-xl rounded-3xl w-112.5 p-10">
 
           <h2 className="text-3xl font-bold text-center mb-2">
             Welcome Back
@@ -138,7 +173,9 @@ function Login() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) =>
+                    setEmail(e.target.value)
+                  }
                   placeholder="Enter email"
                   autoComplete="email"
                   className="w-full border rounded-xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
@@ -150,43 +187,47 @@ function Login() {
 
             {/* Password */}
 
-            {/* Password */}
+            <div className="mb-6">
 
-<div className="mb-6">
+              <div className="flex items-center justify-between">
 
-  <div className="flex items-center justify-between">
-    <label className="font-medium">
-      Password
-    </label>
+                <label className="font-medium">
+                  Password
+                </label>
 
-    <button
-      type="button"
-      onClick={() => navigate("/forgot-password")}
-      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
-    >
-      Forgot Password?
-    </button>
-  </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/forgot-password")
+                  }
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
+                >
+                  Forgot Password?
+                </button>
 
-  <div className="relative mt-2">
+              </div>
 
-    <Lock
-      size={20}
-      className="absolute left-4 top-3 text-gray-400"
-    />
+              <div className="relative mt-2">
 
-    <input
-      type="password"
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-      placeholder="Enter password"
-      autoComplete="current-password"
-      className="w-full border rounded-xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
-    />
+                <Lock
+                  size={20}
+                  className="absolute left-4 top-3 text-gray-400"
+                />
 
-  </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) =>
+                    setPassword(e.target.value)
+                  }
+                  placeholder="Enter password"
+                  autoComplete="current-password"
+                  className="w-full border rounded-xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
+                />
 
-</div>
+              </div>
+
+            </div>
 
             {/* Login Button */}
 
@@ -195,7 +236,42 @@ function Login() {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 rounded-xl font-semibold transition"
             >
-              {loading ? "Logging in..." : "Login"}
+              {loading
+                ? "Logging in..."
+                : "Login"}
+            </button>
+
+            {/* Google Login Divider */}
+
+            <div className="flex items-center gap-3 my-6">
+
+              <div className="flex-1 h-px bg-gray-200"></div>
+
+              <span className="text-sm text-gray-400">
+                OR
+              </span>
+
+              <div className="flex-1 h-px bg-gray-200"></div>
+
+            </div>
+
+            {/* Google Login Button */}
+
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-3"
+            >
+
+              <span className="text-lg font-bold">
+                G
+              </span>
+
+              {loading
+                ? "Connecting..."
+                : "Continue with Google"}
+
             </button>
 
           </form>

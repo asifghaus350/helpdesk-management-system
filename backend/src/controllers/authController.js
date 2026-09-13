@@ -4,7 +4,14 @@ const crypto = require("crypto");
 
 const User = require("../models/User");
 
+const {
+  sendPasswordResetEmail,
+} = require("../services/emailService");
+
+// =========================
 // REGISTER USER
+// =========================
+
 const registerUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -59,7 +66,10 @@ const registerUser = async (req, res) => {
   }
 };
 
+// =========================
 // LOGIN USER
+// =========================
+
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -136,7 +146,10 @@ const loginUser = async (req, res) => {
   }
 };
 
+// =========================
 // GET CURRENT USER
+// =========================
+
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -162,7 +175,10 @@ const getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get current user error:", error.message);
+    console.error(
+      "Get current user error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
@@ -171,7 +187,10 @@ const getMe = async (req, res) => {
   }
 };
 
+// =========================
 // CHANGE PASSWORD
+// =========================
+
 const changePassword = async (req, res) => {
   try {
     const {
@@ -217,10 +236,11 @@ const changePassword = async (req, res) => {
       });
     }
 
-    const isCurrentPasswordValid = await bcrypt.compare(
-      currentPassword,
-      user.password
-    );
+    const isCurrentPasswordValid =
+      await bcrypt.compare(
+        currentPassword,
+        user.password
+      );
 
     if (!isCurrentPasswordValid) {
       return res.status(401).json({
@@ -229,10 +249,11 @@ const changePassword = async (req, res) => {
       });
     }
 
-    const isSamePassword = await bcrypt.compare(
-      newPassword,
-      user.password
-    );
+    const isSamePassword =
+      await bcrypt.compare(
+        newPassword,
+        user.password
+      );
 
     if (isSamePassword) {
       return res.status(400).json({
@@ -256,7 +277,10 @@ const changePassword = async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error("Change password error:", error.message);
+    console.error(
+      "Change password error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
@@ -266,7 +290,10 @@ const changePassword = async (req, res) => {
   }
 };
 
+// =========================
 // FORGOT PASSWORD
+// =========================
+
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -278,7 +305,9 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = email
+      .toLowerCase()
+      .trim();
 
     const user = await User.findOne({
       email: normalizedEmail,
@@ -289,14 +318,16 @@ const forgotPassword = async (req, res) => {
       return res.status(200).json({
         success: true,
         message:
-          "If an account exists with this email, a password reset link has been generated.",
+          "If an account exists with this email, a password reset link has been sent.",
       });
     }
 
-    // Generate secure random token.
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    // Generate secure random reset token.
+    const resetToken = crypto
+      .randomBytes(32)
+      .toString("hex");
 
-    // Store only the hash in database.
+    // Store only SHA-256 hash in database.
     const hashedResetToken = crypto
       .createHash("sha256")
       .update(resetToken)
@@ -311,21 +342,47 @@ const forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // Development reset URL.
-    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password/${resetToken}`;
+    // Create frontend reset URL.
+    const resetUrl = `${
+      process.env.FRONTEND_URL ||
+      "http://localhost:5173"
+    }/reset-password/${resetToken}`;
 
-    // Temporary development logging.
-    // In production this URL should be sent through email.
-    console.log("Password reset URL:", resetUrl);
+    // Send reset email.
+try {
+  await sendPasswordResetEmail(
+    user.email,
+    resetUrl
+  );
+} catch (emailError) {
+  console.error(
+    "Password reset email error:",
+    emailError.message
+  );
 
-    res.status(200).json({
-      success: true,
-      message:
-        "If an account exists with this email, a password reset link has been generated.",
-      resetUrl,
-    });
+  // Clear reset token if email could not be sent.
+  user.resetPasswordToken = null;
+  user.resetPasswordExpires = null;
+
+  await user.save();
+
+  return res.status(500).json({
+    success: false,
+    message:
+      "Unable to send password reset email. Please try again later.",
+  });
+}
+
+res.status(200).json({
+  success: true,
+  message:
+    "If an account exists with this email, a password reset link has been sent.",
+});
   } catch (error) {
-    console.error("Forgot password error:", error.message);
+    console.error(
+      "Forgot password error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
@@ -335,11 +392,18 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+// =========================
 // RESET PASSWORD
+// =========================
+
 const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
-    const { newPassword, confirmPassword } = req.body;
+
+    const {
+      newPassword,
+      confirmPassword,
+    } = req.body;
 
     if (!token) {
       return res.status(400).json({
@@ -372,12 +436,13 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Hash the received token and compare with database.
+    // Hash received token.
     const hashedResetToken = crypto
       .createHash("sha256")
       .update(token)
       .digest("hex");
 
+    // Find user with valid and non-expired token.
     const user = await User.findOne({
       resetPasswordToken: hashedResetToken,
       resetPasswordExpires: {
@@ -393,11 +458,12 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Prevent using the same password.
-    const isSamePassword = await bcrypt.compare(
-      newPassword,
-      user.password
-    );
+    // Prevent reusing current password.
+    const isSamePassword =
+      await bcrypt.compare(
+        newPassword,
+        user.password
+      );
 
     if (isSamePassword) {
       return res.status(400).json({
@@ -407,6 +473,7 @@ const resetPassword = async (req, res) => {
       });
     }
 
+    // Hash new password.
     const hashedPassword = await bcrypt.hash(
       newPassword,
       10
@@ -414,7 +481,7 @@ const resetPassword = async (req, res) => {
 
     user.password = hashedPassword;
 
-    // Invalidate reset token after successful reset.
+    // Invalidate reset token immediately.
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
 
@@ -425,7 +492,10 @@ const resetPassword = async (req, res) => {
       message: "Password reset successfully",
     });
   } catch (error) {
-    console.error("Reset password error:", error.message);
+    console.error(
+      "Reset password error:",
+      error.message
+    );
 
     res.status(500).json({
       success: false,
@@ -434,6 +504,10 @@ const resetPassword = async (req, res) => {
     });
   }
 };
+
+// =========================
+// EXPORT CONTROLLERS
+// =========================
 
 module.exports = {
   registerUser,
