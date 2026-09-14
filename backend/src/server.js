@@ -2,6 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 
+// Load environment variables BEFORE importing routes/controllers
+dotenv.config();
+
 const authRoutes = require("./routes/authRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -9,8 +12,6 @@ const commentRoutes = require("./routes/commentRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 
 const connectDB = require("./config/db");
-
-dotenv.config();
 
 const app = express();
 
@@ -50,7 +51,6 @@ app.use("/api/users", userRoutes);
 // =========================
 
 app.use("/api/comments", commentRoutes);
-
 
 // =========================
 // ACTIVITY ROUTES

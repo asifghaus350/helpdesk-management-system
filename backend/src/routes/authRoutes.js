@@ -11,6 +11,10 @@ const {
 
 const authMiddleware = require("../middleware/authMiddleware");
 
+const {
+  googleLogin,
+} = require("../controllers/googleAuthController");
+
 const router = express.Router();
 
 router.post("/register", registerUser);
@@ -20,6 +24,8 @@ router.post("/login", loginUser);
 router.get("/me", authMiddleware, getMe);
 
 router.put("/change-password", authMiddleware, changePassword);
+
+router.post("/google", googleLogin);
 
 // Forgot Password
 router.post("/forgot-password", forgotPassword);
