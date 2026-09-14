@@ -40,9 +40,14 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
-    department: {
+        department: {
       type: String,
       trim: true,
+      default: "",
+    },
+
+    profilePhoto: {
+      type: String,
       default: "",
     },
 
