@@ -322,10 +322,133 @@ const deleteUser = async (req, res) => {
 // EXPORT
 // =========================
 
+// =========================
+// UPDATE OWN PROFILE
+// ALL AUTHENTICATED USERS
+// =========================
+
+const updateOwnProfile = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+    } = req.body;
+
+    const user = await User.findById(
+      req.user.id
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // =========================
+    // UPDATE NAME
+    // =========================
+
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Name cannot be empty.",
+        });
+      }
+
+      user.name = name.trim();
+    }
+
+    // =========================
+    // UPDATE EMAIL
+    // =========================
+
+    if (email !== undefined) {
+      const normalizedEmail =
+        email.trim().toLowerCase();
+
+      if (!normalizedEmail) {
+        return res.status(400).json({
+          success: false,
+          message: "Email cannot be empty.",
+        });
+      }
+
+      const existingUser =
+        await User.findOne({
+          email: normalizedEmail,
+          _id: { $ne: user._id },
+        });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Another user already uses this email.",
+        });
+      }
+
+      user.email = normalizedEmail;
+    }
+
+    // =========================
+    // UPDATE PHONE
+    // =========================
+
+    if (phone !== undefined) {
+      user.phone = phone.trim();
+    }
+
+    // =========================
+    // SAVE
+    // =========================
+
+    await user.save();
+
+    // =========================
+    // RESPONSE
+    // =========================
+
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      phone: user.phone,
+      department: user.department,
+      profilePhoto: user.profilePhoto,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error(
+      "Update own profile error:",
+      error.message
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Server error while updating profile.",
+    });
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
   createUser,
   updateUser,
   deleteUser,
+  updateOwnProfile,
+  updateProfilePhoto,
 };

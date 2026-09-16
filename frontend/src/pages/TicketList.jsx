@@ -1,34 +1,72 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 
 import Layout from "../components/layout/Layout";
 import TicketTable from "../components/ticket/TicketTable";
 
 function TicketList() {
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
-  const [category, setCategory] = useState("");
+  // =========================
+  // URL SEARCH PARAMETERS
+  // =========================
+
+  const [searchParams, setSearchParams] =
+    useSearchParams();
+
+  // =========================
+  // FILTER STATES
+  // =========================
+
+  const [search, setSearch] = useState(
+    searchParams.get("search") || ""
+  );
+
+  const [status, setStatus] = useState(
+    searchParams.get("status") || ""
+  );
+
+  const [priority, setPriority] = useState(
+    searchParams.get("priority") || ""
+  );
+
+  const [category, setCategory] = useState(
+    searchParams.get("category") || ""
+  );
+
+  // =========================
+  // THEME
+  // =========================
 
   const [theme, setTheme] = useState(() => {
-    const savedSettings = localStorage.getItem("settings");
+    const savedSettings =
+      localStorage.getItem("settings");
 
     if (savedSettings) {
-      return JSON.parse(savedSettings).theme || "light";
+      return (
+        JSON.parse(savedSettings).theme ||
+        "light"
+      );
     }
 
     return "light";
   });
 
+  // =========================
+  // SETTINGS CHANGE
+  // =========================
+
   useEffect(() => {
     const handleSettingsChange = () => {
-      const savedSettings = localStorage.getItem("settings");
+      const savedSettings =
+        localStorage.getItem("settings");
 
       if (savedSettings) {
-        const parsedSettings = JSON.parse(savedSettings);
+        const parsedSettings =
+          JSON.parse(savedSettings);
 
-        setTheme(parsedSettings.theme || "light");
+        setTheme(
+          parsedSettings.theme || "light"
+        );
       }
     };
 
@@ -45,12 +83,89 @@ function TicketList() {
     };
   }, []);
 
+  // =========================
+  // SYNC FILTERS WITH URL
+  // =========================
+
+
+  // =========================
+  // UPDATE URL FILTER
+  // =========================
+
+  const updateFilter = (key, value) => {
+    const params = new URLSearchParams(
+      searchParams
+    );
+
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+
+    setSearchParams(params);
+  };
+
+  // =========================
+  // SEARCH CHANGE
+  // =========================
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+
+    setSearch(value);
+    updateFilter("search", value);
+  };
+
+  // =========================
+  // STATUS CHANGE
+  // =========================
+
+  const handleStatusChange = (e) => {
+    const value = e.target.value;
+
+    setStatus(value);
+    updateFilter("status", value);
+  };
+
+  // =========================
+  // PRIORITY CHANGE
+  // =========================
+
+  const handlePriorityChange = (e) => {
+    const value = e.target.value;
+
+    setPriority(value);
+    updateFilter("priority", value);
+  };
+
+  // =========================
+  // CATEGORY CHANGE
+  // =========================
+
+  const handleCategoryChange = (e) => {
+    const value = e.target.value;
+
+    setCategory(value);
+    updateFilter("category", value);
+  };
+
+  // =========================
+  // THEME
+  // =========================
+
   const isDark = theme === "dark";
+
+  // =========================
+  // PAGE
+  // =========================
 
   return (
     <Layout>
 
-      {/* Heading */}
+      {/* =========================
+          HEADING
+      ========================= */}
 
       <div className="mb-8">
 
@@ -71,12 +186,15 @@ function TicketList() {
               : "text-gray-500"
           }`}
         >
-          View, search and manage all support tickets.
+          View, search and manage all support
+          tickets.
         </p>
 
       </div>
 
-      {/* Search & Filters */}
+      {/* =========================
+          SEARCH & FILTERS
+      ========================= */}
 
       <div
         className={`rounded-2xl shadow-md p-6 mb-8 ${
@@ -88,7 +206,7 @@ function TicketList() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
 
-          {/* Search */}
+          {/* SEARCH */}
 
           <div className="relative lg:col-span-2">
 
@@ -105,7 +223,9 @@ function TicketList() {
               type="text"
               placeholder="Search tickets..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={
+                handleSearchChange
+              }
               className={`w-full border rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
                 isDark
                   ? "bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
@@ -115,60 +235,97 @@ function TicketList() {
 
           </div>
 
-          {/* Status */}
+          {/* STATUS */}
 
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={
+              handleStatusChange
+            }
             className={`border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
               isDark
                 ? "bg-slate-700 border-slate-600 text-white"
                 : "bg-white border-gray-300 text-slate-800"
             }`}
           >
-            <option value="">All Status</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Closed">Closed</option>
+            <option value="">
+              All Status
+            </option>
+
+            <option value="Open">
+              Open
+            </option>
+
+            <option value="In Progress">
+              In Progress
+            </option>
+
+            <option value="Closed">
+              Closed
+            </option>
           </select>
 
-          {/* Priority */}
+          {/* PRIORITY */}
 
           <select
             value={priority}
-            onChange={(e) => setPriority(e.target.value)}
+            onChange={
+              handlePriorityChange
+            }
             className={`border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
               isDark
                 ? "bg-slate-700 border-slate-600 text-white"
                 : "bg-white border-gray-300 text-slate-800"
             }`}
           >
-            <option value="">All Priority</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            <option value="">
+              All Priority
+            </option>
+
+            <option value="High">
+              High
+            </option>
+
+            <option value="Medium">
+              Medium
+            </option>
+
+            <option value="Low">
+              Low
+            </option>
           </select>
 
-          {/* Category */}
+          {/* CATEGORY */}
 
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={
+              handleCategoryChange
+            }
             className={`border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
               isDark
                 ? "bg-slate-700 border-slate-600 text-white"
                 : "bg-white border-gray-300 text-slate-800"
             }`}
           >
-            <option value="">All Categories</option>
-            <option value="Bug">Bug</option>
-            <option value="Support">Support</option>
+            <option value="">
+              All Categories
+            </option>
+
+            <option value="Bug">
+              Bug
+            </option>
+
+            <option value="Support">
+              Support
+            </option>
+
             <option value="Feature Request">
               Feature Request
             </option>
           </select>
 
-          {/* Create Ticket */}
+          {/* CREATE TICKET */}
 
           <Link
             to="/tickets/create"
@@ -181,7 +338,9 @@ function TicketList() {
 
       </div>
 
-      {/* Ticket Table */}
+      {/* =========================
+          TICKET TABLE
+      ========================= */}
 
       <TicketTable
         search={search}

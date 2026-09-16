@@ -524,7 +524,7 @@ function Profile() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/users/${userId}`,
+        "http://localhost:5000/api/users/profile",
         {
           method: "PUT",
           headers: {
@@ -1548,6 +1548,43 @@ function Profile() {
 
           </div>
 
+        </div>
+
+                {/* =========================
+            ACCOUNT PREFERENCES
+        ========================= */}
+
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <div className="px-6 py-5 border-b border-slate-200">
+            <h2 className="text-xl font-bold text-slate-800">
+              Account Preferences
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              Manage your notification, appearance, and dashboard preferences.
+            </p>
+          </div>
+
+          <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="font-semibold text-slate-700">
+                Preferences & Settings
+              </p>
+
+              <p className="text-sm text-slate-500 mt-1">
+                Customize your notification preferences, theme, and dashboard
+                experience.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate("/settings")}
+              className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold transition w-full sm:w-auto"
+            >
+              Open Settings
+            </button>
+          </div>
         </div>
 
       </div>

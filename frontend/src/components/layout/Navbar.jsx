@@ -243,10 +243,18 @@ function Navbar() {
               : "hover:bg-slate-50"
           }`}
         >
-          <UserCircle
-            size={38}
-            className="text-blue-600"
-          />
+          {user?.profilePhoto ? (
+  <img
+    src={user.profilePhoto}
+    alt="Profile"
+    className="w-10 h-10 rounded-full object-cover border-2 border-blue-100"
+  />
+) : (
+  <UserCircle
+    size={38}
+    className="text-blue-600"
+  />
+)}
 
           <div className="text-left">
             <p
