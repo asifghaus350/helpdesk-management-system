@@ -443,6 +443,123 @@ const updateOwnProfile = async (req, res) => {
   }
 };
 
+// =========================
+// UPDATE OWN PROFILE PHOTO
+// =========================
+
+const updateProfilePhoto = async (req, res) => {
+  try {
+    const { profilePhoto } = req.body;
+
+    // Validate request
+    if (profilePhoto === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile photo is required.",
+      });
+    }
+
+    // =========================
+    // REMOVE PROFILE PHOTO
+    // =========================
+
+    if (profilePhoto === "") {
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { profilePhoto: "" },
+        { new: true }
+      ).select("-password");
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Profile photo removed successfully.",
+        user,
+      });
+    }
+
+    // =========================
+    // VALIDATE IMAGE FORMAT
+    // =========================
+
+    const photoPattern =
+      /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+
+    if (!photoPattern.test(profilePhoto)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid image format. Only JPG, JPEG, PNG and WebP are allowed.",
+      });
+    }
+
+    // =========================
+    // EXTRACT BASE64 DATA
+    // =========================
+
+    const base64Data = profilePhoto.split(",")[1];
+
+    if (!base64Data) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid profile photo data.",
+      });
+    }
+
+    // =========================
+    // CHECK IMAGE SIZE
+    // =========================
+
+    const imageSize =
+      Buffer.from(base64Data, "base64").length;
+
+    const maxSize = 5 * 1024 * 1024;
+
+    if (imageSize > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile photo must be 5 MB or smaller.",
+      });
+    }
+
+    // =========================
+    // SAVE PROFILE PHOTO
+    // =========================
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { profilePhoto },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile photo updated successfully.",
+      user,
+    });
+  } catch (error) {
+    console.error("Update Profile Photo Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile photo.",
+    });
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
