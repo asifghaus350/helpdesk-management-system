@@ -4,30 +4,28 @@ import {
   Mail,
   Phone,
   Building2,
-  Pencil,
   Lock,
   Eye,
   EyeOff,
   KeyRound,
   Camera,
   Trash2,
-  Ticket,
-  CheckCircle2,
   CircleDot,
   ShieldCheck,
+  Settings,
+  Save,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
 import Layout from "../components/layout/Layout";
 
 function Profile() {
   const navigate = useNavigate();
 
   // =========================
-  // EDIT MODE
+  // ACTIVE PROFILE TAB
   // =========================
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState("personal");
 
   // =========================
   // PROFILE
@@ -79,19 +77,24 @@ function Profile() {
   const [userId, setUserId] = useState(null);
 
   // =========================
-  // LOADING / ERROR
+  // LOADING / ACTION STATES
   // =========================
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] =
     useState(false);
-
   const [photoUploading, setPhotoUploading] =
     useState(false);
 
+  // =========================
+  // MESSAGES
+  // =========================
+
   const [error, setError] = useState("");
   const [photoError, setPhotoError] = useState("");
+  const [profileSuccess, setProfileSuccess] =
+    useState("");
   const [passwordError, setPasswordError] =
     useState("");
   const [passwordSuccess, setPasswordSuccess] =
@@ -114,10 +117,6 @@ function Profile() {
           return;
         }
 
-        // =========================
-        // GET CURRENT USER
-        // =========================
-
         const response = await fetch(
           "http://localhost:5000/api/auth/me",
           {
@@ -132,8 +131,7 @@ function Profile() {
 
         if (!response.ok) {
           throw new Error(
-            data.message ||
-              "Failed to fetch profile"
+            data.message || "Failed to fetch profile"
           );
         }
 
@@ -145,15 +143,7 @@ function Profile() {
           );
         }
 
-        // =========================
-        // SAVE USER ID
-        // =========================
-
         setUserId(currentUser.id);
-
-        // =========================
-        // SET PROFILE
-        // =========================
 
         setProfile({
           name: currentUser.name || "",
@@ -161,16 +151,12 @@ function Profile() {
           role: currentUser.role || "",
           status: currentUser.status || "Active",
           phone: currentUser.phone || "",
-          department:
-            currentUser.department || "",
+          department: currentUser.department || "",
           profilePhoto:
             currentUser.profilePhoto || "",
         });
 
-        // =========================
-        // UPDATE LOCAL STORAGE
-        // =========================
-
+        // Keep Navbar user data synchronized.
         const storedUser = JSON.parse(
           localStorage.getItem("user") || "{}"
         );
@@ -181,6 +167,10 @@ function Profile() {
             ...storedUser,
             ...currentUser,
           })
+        );
+
+        window.dispatchEvent(
+          new Event("userChanged")
         );
 
         // =========================
@@ -254,6 +244,9 @@ function Profile() {
       ...prev,
       [name]: value,
     }));
+
+    setProfileSuccess("");
+    setError("");
   };
 
   // =========================
@@ -267,6 +260,9 @@ function Profile() {
       ...prev,
       [name]: value,
     }));
+
+    setPasswordError("");
+    setPasswordSuccess("");
   };
 
   // =========================
@@ -281,10 +277,6 @@ function Profile() {
     }
 
     setPhotoError("");
-
-    // =========================
-    // VALIDATE FILE TYPE
-    // =========================
 
     const allowedTypes = [
       "image/jpeg",
@@ -301,10 +293,6 @@ function Profile() {
       return;
     }
 
-    // =========================
-    // VALIDATE FILE SIZE
-    // =========================
-
     const maxSize = 5 * 1024 * 1024;
 
     if (file.size > maxSize) {
@@ -315,10 +303,6 @@ function Profile() {
       e.target.value = "";
       return;
     }
-
-    // =========================
-    // CONVERT TO BASE64
-    // =========================
 
     const reader = new FileReader();
 
@@ -358,18 +342,13 @@ function Profile() {
           );
         }
 
-        const updatedUser =
-          data.user || {};
+        const updatedUser = data.user || {};
 
         setProfile((prev) => ({
           ...prev,
           profilePhoto:
             updatedUser.profilePhoto || "",
         }));
-
-        // =========================
-        // UPDATE LOCAL STORAGE
-        // =========================
 
         const storedUser = JSON.parse(
           localStorage.getItem("user") || "{}"
@@ -423,9 +402,7 @@ function Profile() {
       setPhotoUploading(true);
       setPhotoError("");
 
-      const token = localStorage.getItem(
-        "token"
-      );
+      const token = localStorage.getItem("token");
 
       if (!token) {
         navigate("/login");
@@ -455,17 +432,12 @@ function Profile() {
         );
       }
 
-      const updatedUser =
-        data.user || {};
+      const updatedUser = data.user || {};
 
       setProfile((prev) => ({
         ...prev,
         profilePhoto: "",
       }));
-
-      // =========================
-      // UPDATE LOCAL STORAGE
-      // =========================
 
       const storedUser = JSON.parse(
         localStorage.getItem("user") || "{}"
@@ -507,10 +479,9 @@ function Profile() {
     try {
       setSaving(true);
       setError("");
+      setProfileSuccess("");
 
-      const token = localStorage.getItem(
-        "token"
-      );
+      const token = localStorage.getItem("token");
 
       if (!token) {
         navigate("/login");
@@ -548,8 +519,7 @@ function Profile() {
         );
       }
 
-      const updatedUser =
-        data.user || {};
+      const updatedUser = data.user || {};
 
       setProfile((prev) => ({
         ...prev,
@@ -576,10 +546,6 @@ function Profile() {
           prev.profilePhoto,
       }));
 
-      // =========================
-      // UPDATE LOCAL STORAGE
-      // =========================
-
       const storedUser = JSON.parse(
         localStorage.getItem("user") || "{}"
       );
@@ -596,10 +562,8 @@ function Profile() {
         new Event("userChanged")
       );
 
-      setIsEditing(false);
-
-      alert(
-        "Profile updated successfully!"
+      setProfileSuccess(
+        "Profile updated successfully."
       );
     } catch (error) {
       console.error(
@@ -633,10 +597,6 @@ function Profile() {
         newPassword,
         confirmPassword,
       } = passwordData;
-
-      // =========================
-      // FRONTEND VALIDATION
-      // =========================
 
       if (
         !currentPassword ||
@@ -677,10 +637,6 @@ function Profile() {
         return;
       }
 
-      // =========================
-      // CHANGE PASSWORD API
-      // =========================
-
       const response = await fetch(
         "http://localhost:5000/api/auth/change-password",
         {
@@ -705,10 +661,6 @@ function Profile() {
             "Failed to change password"
         );
       }
-
-      // =========================
-      // CLEAR PASSWORD FIELDS
-      // =========================
 
       setPasswordData({
         currentPassword: "",
@@ -739,15 +691,28 @@ function Profile() {
   // =========================
 
   const profileInitial =
-    profile.name?.trim()?.charAt(0)?.toUpperCase() ||
-    "U";
+    profile.name
+      ?.trim()
+      ?.charAt(0)
+      ?.toUpperCase() || "U";
+
+  const roleLabel = profile.role || "User";
 
   // =========================
-  // ROLE LABEL
+  // STAT SHORTCUTS
   // =========================
 
-  const roleLabel =
-    profile.role || "User";
+  const openTickets = () => {
+    navigate("/tickets?status=Open");
+  };
+
+  const openResolvedTickets = () => {
+    navigate("/tickets?status=Closed");
+  };
+
+  const openAllTickets = () => {
+    navigate("/tickets");
+  };
 
   // =========================
   // LOADING
@@ -759,7 +724,6 @@ function Profile() {
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-8 py-6 text-center">
             <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-
             <p className="text-slate-500">
               Loading profile...
             </p>
@@ -769,824 +733,738 @@ function Profile() {
     );
   }
 
-  // =========================
-  // PROFILE PAGE
-  // =========================
-
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="max-w-6xl mx-auto space-y-6">
 
         {/* =========================
             PAGE HEADING
         ========================= */}
 
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">
-            My Profile
-          </h1>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">
+              My Profile
+            </h1>
 
-          <p className="text-slate-500 mt-2">
-            Manage your account and personal
-            information.
-          </p>
+            <p className="text-slate-500 mt-1">
+              View and manage your profile information.
+            </p>
+          </div>
+
+          <div className="text-sm text-slate-400 hidden sm:block">
+            Dashboard <span className="mx-2">›</span> Profile
+          </div>
         </div>
 
         {/* =========================
-            PROFILE ERROR
+            PAGE ERROR
         ========================= */}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-xl">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
             {error}
           </div>
         )}
 
         {/* =========================
-            PROFILE HEADER CARD
+            MAIN PROFILE LAYOUT
         ========================= */}
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-5 items-start">
 
-          <div className="p-6 sm:p-8">
+          {/* =========================
+              LEFT PROFILE SUMMARY
+          ========================= */}
 
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <aside className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
 
-              {/* PROFILE IDENTITY */}
+            {/* PHOTO */}
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="flex justify-center">
+              <div className="relative w-24 h-24">
 
-                {/* PHOTO */}
-
-                <div className="relative w-28 h-28 shrink-0">
-
-                  {profile.profilePhoto ? (
-                    <img
-                      src={profile.profilePhoto}
-                      alt="Profile"
-                      className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-md ring-1 ring-slate-200"
-                    />
-                  ) : (
-                    <div className="w-28 h-28 rounded-full bg-blue-600 text-white flex items-center justify-center text-4xl font-bold shadow-md ring-4 ring-blue-50">
-                      {profileInitial}
-                    </div>
-                  )}
-
-                  {/* CAMERA BUTTON */}
-
-                  <label
-                    htmlFor="profile-photo"
-                    className={`absolute bottom-0 right-0 w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center border-4 border-white shadow cursor-pointer hover:bg-blue-700 transition ${
-                      photoUploading
-                        ? "opacity-50 pointer-events-none"
-                        : ""
-                    }`}
-                    title="Change profile photo"
-                  >
-                    <Camera size={16} />
-
-                    <input
-                      id="profile-photo"
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={
-                        handlePhotoChange
-                      }
-                      disabled={
-                        photoUploading
-                      }
-                    />
-                  </label>
-                </div>
-
-                {/* USER DETAILS */}
-
-                <div>
-
-                  <h2 className="text-2xl font-bold text-slate-800">
-                    {profile.name || "User"}
-                  </h2>
-
-                  <p className="text-slate-500 mt-1">
-                    {roleLabel}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2 mt-3">
-
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
-                      <ShieldCheck
-                        size={14}
-                      />
-                      {roleLabel}
-                    </span>
-
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                        profile.status ===
-                        "Active"
-                          ? "bg-green-50 text-green-700"
-                          : "bg-red-50 text-red-700"
-                      }`}
-                    >
-                      <CircleDot
-                        size={13}
-                      />
-
-                      {profile.status ||
-                        "Active"}
-                    </span>
-
-                  </div>
-
-                  {/* PHOTO ACTIONS */}
-
-                  <div className="flex flex-wrap gap-3 mt-4">
-
-                    <label
-                      htmlFor="profile-photo"
-                      className={`text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer ${
-                        photoUploading
-                          ? "opacity-50 pointer-events-none"
-                          : ""
-                      }`}
-                    >
-                      {photoUploading
-                        ? "Uploading..."
-                        : profile.profilePhoto
-                        ? "Change Photo"
-                        : "Upload Photo"}
-                    </label>
-
-                    {profile.profilePhoto && (
-                      <button
-                        type="button"
-                        onClick={
-                          handleRemovePhoto
-                        }
-                        disabled={
-                          photoUploading
-                        }
-                        className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-                      >
-                        <Trash2
-                          size={15}
-                        />
-                        Remove Photo
-                      </button>
-                    )}
-
-                  </div>
-
-                  <p className="text-xs text-slate-400 mt-2">
-                    JPG, JPEG, PNG or WebP ·
-                    Maximum 5 MB
-                  </p>
-
-                  {photoError && (
-                    <p className="text-sm text-red-600 mt-2">
-                      {photoError}
-                    </p>
-                  )}
-
-                </div>
-
-              </div>
-
-              {/* EDIT BUTTON */}
-
-              <div className="flex lg:justify-end">
-
-                {!isEditing ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setIsEditing(true)
-                    }
-                    className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold transition w-full sm:w-auto"
-                  >
-                    <Pencil size={17} />
-                    Edit Profile
-                  </button>
+                {profile.profilePhoto ? (
+                  <img
+                    src={profile.profilePhoto}
+                    alt="Profile"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-sm ring-1 ring-slate-200"
+                  />
                 ) : (
-                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setIsEditing(false)
-                      }
-                      disabled={saving}
-                      className="px-5 py-3 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 font-medium"
-                    >
-                      Cancel
-                    </button>
-
-                    <button
-                      type="submit"
-                      form="profile-form"
-                      disabled={saving}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed"
-                    >
-                      {saving
-                        ? "Saving..."
-                        : "Save Changes"}
-                    </button>
-
+                  <div className="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-semibold shadow-sm ring-4 ring-blue-50">
+                    {profileInitial}
                   </div>
                 )}
 
-              </div>
+                <label
+                  htmlFor="profile-photo"
+                  title="Change profile photo"
+                  className={`absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center border-2 border-white shadow cursor-pointer hover:bg-blue-700 transition ${
+                    photoUploading
+                      ? "opacity-50 pointer-events-none"
+                      : ""
+                  }`}
+                >
+                  <Camera size={14} />
 
+                  <input
+                    id="profile-photo"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                    disabled={photoUploading}
+                  />
+                </label>
+              </div>
             </div>
 
-          </div>
+            {/* IDENTITY */}
 
-        </div>
+            <div className="text-center mt-4">
+              <h2 className="text-lg font-bold text-slate-800">
+                {profile.name || "User"}
+              </h2>
 
-        {/* =========================
-            TICKET STATISTICS
-        ========================= */}
+              <p className="text-sm text-slate-500 mt-0.5">
+                {roleLabel}
+              </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-
-          {/* TOTAL */}
-
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-
-            <div className="flex items-center justify-between">
-
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Total Tickets
-                </p>
-
-                <p className="text-3xl font-bold text-slate-800 mt-2">
-                  {ticketStats.total}
-                </p>
+              <div className="flex justify-center mt-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                    profile.status === "Active"
+                      ? "bg-green-50 text-green-700"
+                      : "bg-red-50 text-red-700"
+                  }`}
+                >
+                  <CircleDot size={12} />
+                  {profile.status || "Active"}
+                </span>
               </div>
-
-              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Ticket size={23} />
-              </div>
-
             </div>
 
-          </div>
+            {/* PHOTO ACTIONS */}
 
-          {/* RESOLVED */}
+            <div className="flex justify-center flex-wrap gap-3 mt-4">
+              <label
+                htmlFor="profile-photo"
+                className={`text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer ${
+                  photoUploading
+                    ? "opacity-50 pointer-events-none"
+                    : ""
+                }`}
+              >
+                {photoUploading
+                  ? "Uploading..."
+                  : profile.profilePhoto
+                  ? "Change Photo"
+                  : "Upload Photo"}
+              </label>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-
-            <div className="flex items-center justify-between">
-
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Resolved Tickets
-                </p>
-
-                <p className="text-3xl font-bold text-slate-800 mt-2">
-                  {ticketStats.resolved}
-                </p>
-              </div>
-
-              <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-                <CheckCircle2
-                  size={23}
-                />
-              </div>
-
+              {profile.profilePhoto && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  disabled={photoUploading}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                  <Trash2 size={13} />
+                  Remove
+                </button>
+              )}
             </div>
 
-          </div>
-
-          {/* OPEN */}
-
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-
-            <div className="flex items-center justify-between">
-
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Open Tickets
-                </p>
-
-                <p className="text-3xl font-bold text-slate-800 mt-2">
-                  {ticketStats.open}
-                </p>
-              </div>
-
-              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <CircleDot
-                  size={23}
-                />
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* =========================
-            PERSONAL INFORMATION
-        ========================= */}
-
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-
-          <div className="px-6 py-5 border-b border-slate-200">
-
-            <h2 className="text-xl font-bold text-slate-800">
-              Personal Information
-            </h2>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Update your personal contact
-              information.
+            <p className="text-[11px] text-center text-slate-400 mt-2">
+              JPG, JPEG, PNG or WebP · Max 5 MB
             </p>
 
-          </div>
+            {photoError && (
+              <p className="text-xs text-red-600 text-center mt-2">
+                {photoError}
+              </p>
+            )}
 
-          <form
-            id="profile-form"
-            onSubmit={handleSave}
-            className="p-6"
-          >
+            {/* DIVIDER */}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="border-t border-slate-100 my-5" />
 
-              {/* NAME */}
+            {/* COMPACT TICKET STATS */}
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Full Name
-                </label>
+            <div className="grid grid-cols-3 text-center">
 
-                <div className="relative">
-
-                  <User
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type="text"
-                    name="name"
-                    value={profile.name}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                    className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-500 transition"
-                  />
-
-                </div>
-              </div>
-
-              {/* EMAIL */}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Email
-                </label>
-
-                <div className="relative">
-
-                  <Mail
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type="email"
-                    name="email"
-                    value={profile.email}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                    className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-500 transition"
-                  />
-
-                </div>
-              </div>
-
-              {/* PHONE */}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Phone
-                </label>
-
-                <div className="relative">
-
-                  <Phone
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type="text"
-                    name="phone"
-                    value={profile.phone}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                    className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-500 transition"
-                  />
-
-                </div>
-              </div>
-
-              {/* DEPARTMENT */}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Department
-                </label>
-
-                <div className="relative">
-
-                  <Building2
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type="text"
-                    value={
-                      profile.department ||
-                      "Not assigned"
-                    }
-                    disabled
-                    className="w-full border border-slate-200 rounded-xl pl-11 pr-4 py-3 bg-slate-50 text-slate-500"
-                  />
-
-                </div>
-
-                <p className="text-xs text-slate-400 mt-2">
-                  Department can only be changed
-                  by an administrator.
+              <button
+                type="button"
+                onClick={openAllTickets}
+                className="group"
+              >
+                <p className="text-xl font-bold text-slate-800 group-hover:text-blue-600 transition">
+                  {ticketStats.total}
                 </p>
-              </div>
 
-              {/* ROLE */}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Role
-                </label>
-
-                <div className="relative">
-
-                  <ShieldCheck
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type="text"
-                    value={profile.role}
-                    disabled
-                    className="w-full border border-slate-200 rounded-xl pl-11 pr-4 py-3 bg-slate-50 text-slate-500"
-                  />
-
-                </div>
-
-                <p className="text-xs text-slate-400 mt-2">
-                  Role can only be changed by an
-                  administrator.
+                <p className="text-[10px] leading-4 text-slate-500 mt-1">
+                  Tickets
+                  <br />
+                  Created
                 </p>
-              </div>
+              </button>
 
-              {/* STATUS */}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Account Status
-                </label>
-
-                <div className="flex items-center h-12.5 px-4 border border-slate-200 rounded-xl bg-slate-50">
-
-                  <span
-                    className={`inline-flex items-center gap-2 text-sm font-semibold ${
-                      profile.status ===
-                      "Active"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    <CircleDot
-                      size={16}
-                    />
-
-                    {profile.status ||
-                      "Active"}
-                  </span>
-
-                </div>
-
-                <p className="text-xs text-slate-400 mt-2">
-                  Account status can only be
-                  changed by an administrator.
+              <button
+                type="button"
+                onClick={openResolvedTickets}
+                className="group border-x border-slate-100"
+              >
+                <p className="text-xl font-bold text-slate-800 group-hover:text-green-600 transition">
+                  {ticketStats.resolved}
                 </p>
-              </div>
+
+                <p className="text-[10px] leading-4 text-slate-500 mt-1">
+                  Resolved
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={openTickets}
+                className="group"
+              >
+                <p className="text-xl font-bold text-slate-800 group-hover:text-amber-600 transition">
+                  {ticketStats.open}
+                </p>
+
+                <p className="text-[10px] leading-4 text-slate-500 mt-1">
+                  Open
+                </p>
+              </button>
 
             </div>
 
-          </form>
+          </aside>
 
-        </div>
+          {/* =========================
+              RIGHT TABBED PROFILE CARD
+          ========================= */}
 
-        {/* =========================
-            CHANGE PASSWORD
-        ========================= */}
+          <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            {/* TABS */}
 
-          <div className="px-6 py-5 border-b border-slate-200">
-
-            <div className="flex items-center gap-3">
-
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <KeyRound size={20} />
-              </div>
-
-              <div>
-
-                <h2 className="text-xl font-bold text-slate-800">
-                  Change Password
-                </h2>
-
-                <p className="text-sm text-slate-500 mt-1">
-                  Update your account password
-                  securely.
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          <div className="p-6">
-
-            {/* PASSWORD ERROR */}
-
-            {passwordError && (
-              <div className="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {passwordError}
-              </div>
-            )}
-
-            {/* PASSWORD SUCCESS */}
-
-            {passwordSuccess && (
-              <div className="mb-5 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
-                {passwordSuccess}
-              </div>
-            )}
-
-            <form
-              onSubmit={handleChangePassword}
-              className="space-y-5"
-            >
-
-              {/* CURRENT PASSWORD */}
-
-              <div>
-
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Current Password
-                </label>
-
-                <div className="relative">
-
-                  <Lock
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type={
-                      showCurrentPassword
-                        ? "text"
-                        : "password"
-                    }
-                    name="currentPassword"
-                    value={
-                      passwordData.currentPassword
-                    }
-                    onChange={
-                      handlePasswordChange
-                    }
-                    placeholder="Enter current password"
-                    autoComplete="current-password"
-                    className="w-full border border-slate-300 rounded-xl pl-11 pr-12 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowCurrentPassword(
-                        (prev) => !prev
-                      )
-                    }
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showCurrentPassword ? (
-                      <EyeOff size={19} />
-                    ) : (
-                      <Eye size={19} />
-                    )}
-                  </button>
-
-                </div>
-
-              </div>
-
-              {/* NEW PASSWORD */}
-
-              <div>
-
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  New Password
-                </label>
-
-                <div className="relative">
-
-                  <Lock
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type={
-                      showNewPassword
-                        ? "text"
-                        : "password"
-                    }
-                    name="newPassword"
-                    value={
-                      passwordData.newPassword
-                    }
-                    onChange={
-                      handlePasswordChange
-                    }
-                    placeholder="Enter new password"
-                    autoComplete="new-password"
-                    className="w-full border border-slate-300 rounded-xl pl-11 pr-12 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowNewPassword(
-                        (prev) => !prev
-                      )
-                    }
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showNewPassword ? (
-                      <EyeOff size={19} />
-                    ) : (
-                      <Eye size={19} />
-                    )}
-                  </button>
-
-                </div>
-
-                <p className="text-xs text-slate-400 mt-2">
-                  Minimum 6 characters.
-                </p>
-
-              </div>
-
-              {/* CONFIRM PASSWORD */}
-
-              <div>
-
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Confirm New Password
-                </label>
-
-                <div className="relative">
-
-                  <Lock
-                    size={18}
-                    className="absolute left-3.5 top-3.5 text-slate-400"
-                  />
-
-                  <input
-                    type={
-                      showConfirmPassword
-                        ? "text"
-                        : "password"
-                    }
-                    name="confirmPassword"
-                    value={
-                      passwordData.confirmPassword
-                    }
-                    onChange={
-                      handlePasswordChange
-                    }
-                    placeholder="Confirm new password"
-                    autoComplete="new-password"
-                    className="w-full border border-slate-300 rounded-xl pl-11 pr-12 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowConfirmPassword(
-                        (prev) => !prev
-                      )
-                    }
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff size={19} />
-                    ) : (
-                      <Eye size={19} />
-                    )}
-                  </button>
-
-                </div>
-
-              </div>
-
-              {/* FORGOT PASSWORD */}
-
-              <div className="pt-1">
+            <div className="border-b border-slate-200 px-4 sm:px-5">
+              <div className="flex items-center gap-5 overflow-x-auto">
 
                 <button
                   type="button"
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  onClick={() =>
-                    navigate(
-                      "/forgot-password"
-                    )
-                  }
+                  onClick={() => {
+                    setActiveTab("personal");
+                    setError("");
+                    setProfileSuccess("");
+                  }}
+                  className={`relative py-4 text-sm font-semibold whitespace-nowrap ${
+                    activeTab === "personal"
+                      ? "text-blue-600"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
                 >
-                  Forgot Password?
+                  Personal Info
+
+                  {activeTab === "personal" && (
+                    <span className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-600 rounded-full" />
+                  )}
                 </button>
-
-              </div>
-
-              {/* CHANGE PASSWORD BUTTON */}
-
-              <div className="flex justify-end pt-2">
 
                 <button
-                  type="submit"
-                  disabled={changingPassword}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed transition"
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("password");
+                    setError("");
+                    setProfileSuccess("");
+                  }}
+                  className={`relative py-4 text-sm font-semibold whitespace-nowrap ${
+                    activeTab === "password"
+                      ? "text-blue-600"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
                 >
-                  {changingPassword
-                    ? "Changing Password..."
-                    : "Change Password"}
+                  Change Password
+
+                  {activeTab === "password" && (
+                    <span className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-600 rounded-full" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("preferences");
+                    setError("");
+                    setProfileSuccess("");
+                  }}
+                  className={`relative py-4 text-sm font-semibold whitespace-nowrap ${
+                    activeTab === "preferences"
+                      ? "text-blue-600"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Preferences
+
+                  {activeTab === "preferences" && (
+                    <span className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-600 rounded-full" />
+                  )}
                 </button>
 
               </div>
-
-            </form>
-
-          </div>
-
-        </div>
-
-                {/* =========================
-            ACCOUNT PREFERENCES
-        ========================= */}
-
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-          <div className="px-6 py-5 border-b border-slate-200">
-            <h2 className="text-xl font-bold text-slate-800">
-              Account Preferences
-            </h2>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Manage your notification, appearance, and dashboard preferences.
-            </p>
-          </div>
-
-          <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <p className="font-semibold text-slate-700">
-                Preferences & Settings
-              </p>
-
-              <p className="text-sm text-slate-500 mt-1">
-                Customize your notification preferences, theme, and dashboard
-                experience.
-              </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => navigate("/settings")}
-              className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-semibold transition w-full sm:w-auto"
-            >
-              Open Settings
-            </button>
-          </div>
-        </div>
+            {/* =========================
+                PERSONAL INFO TAB
+            ========================= */}
 
+            {activeTab === "personal" && (
+              <form
+                onSubmit={handleSave}
+                className="p-5 sm:p-6"
+              >
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-5">
+
+                  {/* FULL NAME */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Full Name
+                    </label>
+
+                    <div className="relative">
+                      <User
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type="text"
+                        name="name"
+                        value={profile.name}
+                        onChange={handleChange}
+                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* EMAIL */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Email
+                    </label>
+
+                    <div className="relative">
+                      <Mail
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type="email"
+                        name="email"
+                        value={profile.email}
+                        onChange={handleChange}
+                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* PHONE */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Phone
+                    </label>
+
+                    <div className="relative">
+                      <Phone
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type="text"
+                        name="phone"
+                        value={profile.phone}
+                        onChange={handleChange}
+                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* DEPARTMENT */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Department
+                    </label>
+
+                    <div className="relative">
+                      <Building2
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type="text"
+                        value={
+                          profile.department ||
+                          "Not assigned"
+                        }
+                        disabled
+                        className="w-full h-12 border border-slate-200 rounded-xl pl-10 pr-4 text-sm bg-slate-50 text-slate-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ROLE */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Role
+                    </label>
+
+                    <div className="relative">
+                      <ShieldCheck
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type="text"
+                        value={profile.role}
+                        disabled
+                        className="w-full h-12 border border-slate-200 rounded-xl pl-10 pr-4 text-sm bg-slate-50 text-slate-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ACCOUNT STATUS */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Account Status
+                    </label>
+
+                    <div className="h-12 px-4 border border-slate-200 rounded-xl bg-slate-50 flex items-center">
+                      <span
+                        className={`inline-flex items-center gap-2 text-sm font-semibold ${
+                          profile.status === "Active"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        <CircleDot size={15} />
+                        {profile.status || "Active"}
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* PROFILE SUCCESS */}
+
+                {profileSuccess && (
+                  <div className="mt-5 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                    {profileSuccess}
+                  </div>
+                )}
+
+                {/* SAVE */}
+
+                <div className="flex justify-end mt-6">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl text-sm font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed transition"
+                  >
+                    <Save size={16} />
+
+                    {saving
+                      ? "Saving..."
+                      : "Save Changes"}
+                  </button>
+                </div>
+
+              </form>
+            )}
+
+            {/* =========================
+                CHANGE PASSWORD TAB
+            ========================= */}
+
+            {activeTab === "password" && (
+              <div className="p-5 sm:p-6">
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <KeyRound size={19} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">
+                      Change Password
+                    </h2>
+
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Update your account password securely.
+                    </p>
+                  </div>
+                </div>
+
+                {passwordError && (
+                  <div className="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                    {passwordError}
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="mb-5 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                    {passwordSuccess}
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleChangePassword}
+                  className="space-y-5"
+                >
+
+                  {/* CURRENT PASSWORD */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Current Password
+                    </label>
+
+                    <div className="relative">
+                      <Lock
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type={
+                          showCurrentPassword
+                            ? "text"
+                            : "password"
+                        }
+                        name="currentPassword"
+                        value={
+                          passwordData.currentPassword
+                        }
+                        onChange={
+                          handlePasswordChange
+                        }
+                        placeholder="Enter current password"
+                        autoComplete="current-password"
+                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowCurrentPassword(
+                            (prev) => !prev
+                          )
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showCurrentPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* NEW PASSWORD */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      New Password
+                    </label>
+
+                    <div className="relative">
+                      <Lock
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type={
+                          showNewPassword
+                            ? "text"
+                            : "password"
+                        }
+                        name="newPassword"
+                        value={
+                          passwordData.newPassword
+                        }
+                        onChange={
+                          handlePasswordChange
+                        }
+                        placeholder="Enter new password"
+                        autoComplete="new-password"
+                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowNewPassword(
+                            (prev) => !prev
+                          )
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showNewPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-slate-400 mt-2">
+                      Minimum 6 characters.
+                    </p>
+                  </div>
+
+                  {/* CONFIRM PASSWORD */}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                      Confirm New Password
+                    </label>
+
+                    <div className="relative">
+                      <Lock
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type={
+                          showConfirmPassword
+                            ? "text"
+                            : "password"
+                        }
+                        name="confirmPassword"
+                        value={
+                          passwordData.confirmPassword
+                        }
+                        onChange={
+                          handlePasswordChange
+                        }
+                        placeholder="Confirm new password"
+                        autoComplete="new-password"
+                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowConfirmPassword(
+                            (prev) => !prev
+                          )
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* FORGOT PASSWORD */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/forgot-password")
+                    }
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Forgot Password?
+                  </button>
+
+                  {/* SUBMIT */}
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      disabled={changingPassword}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl text-sm font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed transition"
+                    >
+                      {changingPassword
+                        ? "Changing Password..."
+                        : "Change Password"}
+                    </button>
+                  </div>
+
+                </form>
+              </div>
+            )}
+
+            {/* =========================
+                PREFERENCES TAB
+            ========================= */}
+
+            {activeTab === "preferences" && (
+              <div className="p-5 sm:p-6">
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Settings size={19} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">
+                      Preferences
+                    </h2>
+
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Manage notifications, appearance and dashboard preferences.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl p-5 bg-slate-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-slate-700">
+                        Preferences & Settings
+                      </p>
+
+                      <p className="text-sm text-slate-500 mt-1">
+                        Customize your notification preferences, theme and dashboard experience.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate("/settings")}
+                      className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl text-sm font-semibold transition shrink-0"
+                    >
+                      <Settings size={16} />
+                      Open Settings
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+          </section>
+        </div>
       </div>
     </Layout>
   );
