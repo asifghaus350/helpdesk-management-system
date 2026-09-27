@@ -1,6 +1,7 @@
 const Comment = require("../models/Comment");
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
+const { checkTicketAccess } = require("../utils/ticketAccess");
 
 // =========================
 // GET TICKET COMMENTS
@@ -16,6 +17,19 @@ const getTicketComments = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Ticket not found",
+      });
+    }
+
+    const hasAccess = await checkTicketAccess(
+      ticket,
+      req.user
+    );
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You do not have permission to access this ticket's comments",
       });
     }
 
@@ -68,6 +82,19 @@ const createComment = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Ticket not found",
+      });
+    }
+
+    const hasAccess = await checkTicketAccess(
+      ticket,
+      req.user
+    );
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You do not have permission to access this ticket's comments",
       });
     }
 

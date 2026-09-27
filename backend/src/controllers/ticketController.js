@@ -1,6 +1,57 @@
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
 const User = require("../models/User");
+const Counter = require("../models/Counter");
+
+const {
+  checkTicketAccess,
+  isAssignedEngineer,
+  isUnassigned,
+  engineerTicketFilter,
+  resolveEngineer,
+} = require("../utils/ticketAccess");
+
+// =========================
+// NEXT TICKET ID
+// =========================
+// Atomic counter so two tickets created at the same time
+// never get the same number. On first use the counter is
+// seeded from the highest existing TKT-number.
+
+let counterSeeded = false;
+
+const nextTicketId = async () => {
+  if (!counterSeeded) {
+    const existing = await Ticket.find()
+      .select("ticketId")
+      .lean();
+
+    const highest = existing.reduce((max, { ticketId }) => {
+      const number = parseInt(
+        (ticketId || "").replace("TKT-", ""),
+        10
+      );
+
+      return Number.isNaN(number) ? max : Math.max(max, number);
+    }, 1000);
+
+    await Counter.updateOne(
+      { _id: "ticket" },
+      { $max: { seq: highest } },
+      { upsert: true }
+    );
+
+    counterSeeded = true;
+  }
+
+  const counter = await Counter.findOneAndUpdate(
+    { _id: "ticket" },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+
+  return `TKT-${counter.seq}`;
+};
 
 // =========================
 // CREATE TICKET
@@ -25,25 +76,25 @@ const createTicket = async (req, res) => {
       });
     }
 
-    // Generate Ticket ID
-    const lastTicket = await Ticket.findOne()
-      .sort({ createdAt: -1 })
-      .select("ticketId");
+    // Only Admin may set status / engineer on create.
+    // Everyone else always starts as an unassigned Open ticket.
+    const isAdmin = req.user.role === "Admin";
 
-    let nextNumber = 1001;
+    let assignment = { engineerId: null, engineer: "" };
 
-    if (lastTicket && lastTicket.ticketId) {
-      const lastNumber = parseInt(
-        lastTicket.ticketId.replace("TKT-", ""),
-        10
-      );
+    if (isAdmin && engineer) {
+      assignment = await resolveEngineer(engineer);
 
-      if (!isNaN(lastNumber)) {
-        nextNumber = lastNumber + 1;
+      if (!assignment) {
+        return res.status(400).json({
+          success: false,
+          message: "Selected engineer was not found",
+        });
       }
     }
 
-    const ticketId = `TKT-${nextNumber}`;
+    // Generate Ticket ID
+    const ticketId = await nextTicketId();
 
     // Create ticket
     const ticket = await Ticket.create({
@@ -52,8 +103,9 @@ const createTicket = async (req, res) => {
       description,
       category,
       priority: priority || "Medium",
-      status: status || "Open",
-      engineer: engineer || "",
+      status: isAdmin ? status || "Open" : "Open",
+      engineer: assignment.engineer,
+      engineerId: assignment.engineerId,
       createdBy: req.user.id,
     });
 
@@ -74,14 +126,14 @@ const createTicket = async (req, res) => {
     // ASSIGNMENT ACTIVITY
     // =========================
 
-    if (engineer) {
+    if (ticket.engineer) {
       await Activity.create({
         ticket: ticket._id,
         user: req.user.id,
         action: "Ticket Assigned",
-        message: `Ticket assigned to ${engineer}`,
+        message: `Ticket assigned to ${ticket.engineer}`,
         oldValue: "",
-        newValue: engineer,
+        newValue: ticket.engineer,
       });
     }
 
@@ -131,24 +183,8 @@ const getTickets = async (req, res) => {
         });
       }
 
-      const engineerName = engineer.name?.trim();
-
-      if (!engineerName) {
-        return res.status(400).json({
-          success: false,
-          message: "Engineer name is missing",
-        });
-      }
-
-      // Engineer can see only tickets assigned to themselves.
-      // Case-insensitive exact name matching.
-      filter.engineer = {
-        $regex: `^${engineerName.replace(
-          /[.*+?^${}()|[\]\\]/g,
-          "\\$&"
-        )}$`,
-        $options: "i",
-      };
+      // Assigned tickets + unassigned queue
+      filter = engineerTicketFilter(engineer);
     }
 
     // =========================
@@ -197,94 +233,22 @@ const getTicketById = async (req, res) => {
       });
     }
 
-    // =========================
-    // ADMIN
-    // =========================
+    const hasAccess = await checkTicketAccess(
+      ticket,
+      req.user
+    );
 
-    if (req.user.role === "Admin") {
-      return res.status(200).json({
-        success: true,
-        ticket,
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You do not have permission to access this ticket",
       });
     }
 
-    // =========================
-    // USER
-    // =========================
-
-    if (req.user.role === "User") {
-      const ticketOwnerId =
-        ticket.createdBy?._id?.toString();
-
-      const loggedInUserId =
-        req.user.id?.toString();
-
-      // User can access only own ticket
-      if (
-        !ticketOwnerId ||
-        ticketOwnerId !== loggedInUserId
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You do not have permission to access this ticket",
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        ticket,
-      });
-    }
-
-    // =========================
-    // ENGINEER
-    // =========================
-
-    if (req.user.role === "Engineer") {
-      const engineer = await User.findById(req.user.id)
-        .select("name");
-
-      if (!engineer) {
-        return res.status(404).json({
-          success: false,
-          message: "Engineer account not found",
-        });
-      }
-
-      const loggedInEngineerName =
-        engineer.name?.trim().toLowerCase();
-
-      const assignedEngineerName =
-        ticket.engineer?.trim().toLowerCase();
-
-      // Engineer can access only assigned ticket
-      if (
-        !loggedInEngineerName ||
-        !assignedEngineerName ||
-        assignedEngineerName !== loggedInEngineerName
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You do not have permission to access this ticket",
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        ticket,
-      });
-    }
-
-    // =========================
-    // OTHER ROLES
-    // =========================
-
-    return res.status(403).json({
-      success: false,
-      message:
-        "You do not have permission to access this ticket",
+    return res.status(200).json({
+      success: true,
+      ticket,
     });
   } catch (error) {
     console.error("Get ticket error:", error.message);
@@ -309,6 +273,7 @@ const updateTicket = async (req, res) => {
       priority,
       status,
       engineer,
+      assignToMe,
     } = req.body;
 
     // =========================
@@ -343,19 +308,12 @@ const updateTicket = async (req, res) => {
     // ENGINEER PERMISSIONS
     // =========================
 
-    if (isEngineer) {
-      // Ticket must have an assigned engineer
-      if (!ticket.engineer) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You can only update tickets assigned to you",
-        });
-      }
+    let loggedInEngineer = null;
 
+    if (isEngineer) {
       // Fetch logged-in engineer from database.
       // JWT contains only user ID and role.
-      const loggedInEngineer =
+      loggedInEngineer =
         await User.findById(req.user.id).select("name");
 
       if (!loggedInEngineer) {
@@ -365,32 +323,32 @@ const updateTicket = async (req, res) => {
         });
       }
 
-      const assignedEngineer =
-        ticket.engineer.trim().toLowerCase();
-
-      const currentEngineer =
-        (loggedInEngineer.name || "")
-          .trim()
-          .toLowerCase();
-
-      // Engineer can update ONLY own assigned ticket
-      if (
-        !currentEngineer ||
-        assignedEngineer !== currentEngineer
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You can only update tickets assigned to you",
-        });
-      }
-
-      // Engineer cannot assign/reassign ticket
+      // Engineer cannot assign/reassign to someone else
       if (engineer !== undefined) {
         return res.status(403).json({
           success: false,
           message:
             "Engineers cannot assign or reassign tickets",
+        });
+      }
+
+      // Unassigned ticket: engineer may only pick it up
+      if (isUnassigned(ticket)) {
+        if (!assignToMe) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Assign this ticket to yourself before updating it",
+          });
+        }
+      } else if (
+        !isAssignedEngineer(ticket, loggedInEngineer)
+      ) {
+        // Engineer can update ONLY own assigned ticket
+        return res.status(403).json({
+          success: false,
+          message:
+            "You can only update tickets assigned to you",
         });
       }
     }
@@ -496,7 +454,27 @@ if (status !== undefined) {
       isAdmin &&
       engineer !== undefined
     ) {
-      ticket.engineer = engineer;
+      const assignment = await resolveEngineer(engineer);
+
+      if (!assignment) {
+        return res.status(400).json({
+          success: false,
+          message: "Selected engineer was not found",
+        });
+      }
+
+      ticket.engineer = assignment.engineer;
+      ticket.engineerId = assignment.engineerId;
+    }
+
+    // Engineer picks up an unassigned ticket
+    if (
+      isEngineer &&
+      assignToMe &&
+      isUnassigned(ticket)
+    ) {
+      ticket.engineer = loggedInEngineer.name;
+      ticket.engineerId = loggedInEngineer._id;
     }
 
     // =========================
@@ -563,11 +541,7 @@ if (status !== undefined) {
     // ENGINEER ASSIGNMENT ACTIVITY
     // =========================
 
-    if (
-      isAdmin &&
-      engineer !== undefined &&
-      oldEngineer !== ticket.engineer
-    ) {
+    if (oldEngineer !== ticket.engineer) {
       await Activity.create({
         ticket: ticket._id,
         user: req.user.id,

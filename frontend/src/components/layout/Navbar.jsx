@@ -6,29 +6,65 @@ import {
   UserCircle,
 } from "lucide-react";
 
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import NotificationDropdown from "../common/NotificationDropdown";
+import { getStoredUser, refreshStoredUser } from "../../utils/auth";
+
+// =========================
+// PAGE TITLES
+// =========================
+
+const pageTitles = [
+  ["/dashboard", "Dashboard"],
+  ["/tickets/create", "Create Ticket"],
+  ["/tickets/edit", "Edit Ticket"],
+  ["/tickets/", "Ticket Details"],
+  ["/tickets", "Tickets"],
+  ["/users", "Users"],
+  ["/reports", "Reports"],
+  ["/profile", "Profile"],
+  ["/settings", "Settings"],
+];
+
+const getPageTitle = (pathname) =>
+  pageTitles.find(([path]) => pathname.startsWith(path))?.[1] ||
+  "HelpDesk";
 
 function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const pageTitle = getPageTitle(location.pathname);
+
+  // =========================
+  // GLOBAL SEARCH
+  // =========================
+
+  const [searchText, setSearchText] = useState("");
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+
+    const query = searchText.trim();
+
+    navigate(
+      query
+        ? `/tickets?search=${encodeURIComponent(query)}`
+        : "/tickets"
+    );
+  };
 
   // =========================
   // LOGGED-IN USER
   // =========================
 
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem("user");
+  const [user, setUser] = useState(getStoredUser);
 
-      return savedUser
-        ? JSON.parse(savedUser)
-        : null;
-    } catch (error) {
-      console.error("Invalid user data:", error);
-      return null;
-    }
-  });
+  // Pick up role / name changes made by an admin
+  useEffect(() => {
+    refreshStoredUser();
+  }, []);
 
   // =========================
   // THEME
@@ -84,23 +120,7 @@ function Navbar() {
     };
 
     const handleUserChange = () => {
-      try {
-        const savedUser =
-          localStorage.getItem("user");
-
-        setUser(
-          savedUser
-            ? JSON.parse(savedUser)
-            : null
-        );
-      } catch (error) {
-        console.error(
-          "User update error:",
-          error
-        );
-
-        setUser(null);
-      }
+      setUser(getStoredUser());
     };
 
     window.addEventListener(
@@ -155,7 +175,7 @@ function Navbar() {
               : "text-slate-800"
           }`}
         >
-          Dashboard
+          {pageTitle}
         </h1>
 
         <p
@@ -179,7 +199,11 @@ function Navbar() {
             SEARCH
         ========================= */}
 
-        <div className="relative">
+        <form
+          onSubmit={handleSearch}
+          className="relative"
+          role="search"
+        >
           <Search
             size={18}
             className={`absolute left-4 top-1/2 -translate-y-1/2 ${
@@ -190,15 +214,18 @@ function Navbar() {
           />
 
           <input
-            type="text"
-            placeholder="Search..."
+            type="search"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search tickets..."
+            aria-label="Search tickets"
             className={`w-80 h-12 pl-11 pr-4 rounded-xl border outline-none transition ${
               isDark
                 ? "bg-slate-800 border-slate-700 text-white placeholder:text-slate-400 focus:border-blue-500"
                 : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-400"
             }`}
           />
-        </div>
+        </form>
 
         {/* =========================
             NOTIFICATIONS

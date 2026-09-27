@@ -1,27 +1,45 @@
 const admin = require("firebase-admin");
 const fs = require("fs");
 
-const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+// Firebase is only needed for Google login.
+// If it is not configured, export null instead of
+// throwing, so the rest of the API still starts.
 
-if (!serviceAccountPath) {
-  throw new Error(
-    "FIREBASE_SERVICE_ACCOUNT_PATH is missing. Please check backend/.env"
-  );
-}
+const initFirebaseAdmin = () => {
+  const serviceAccountPath =
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
-if (!fs.existsSync(serviceAccountPath)) {
-  throw new Error(
-    "Firebase service account JSON file was not found at the configured path."
-  );
-}
+  if (!serviceAccountPath) {
+    console.warn(
+      "FIREBASE_SERVICE_ACCOUNT_PATH is missing. Google login is disabled."
+    );
+    return null;
+  }
 
-const serviceAccount = require(serviceAccountPath);
+  if (!fs.existsSync(serviceAccountPath)) {
+    console.warn(
+      "Firebase service account JSON file was not found. Google login is disabled."
+    );
+    return null;
+  }
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
+  try {
+    const serviceAccount = require(serviceAccountPath);
 
-module.exports = admin;
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    }
+
+    return admin;
+  } catch (error) {
+    console.error(
+      "Firebase admin init failed. Google login is disabled:",
+      error.message
+    );
+    return null;
+  }
+};
+
+module.exports = initFirebaseAdmin();

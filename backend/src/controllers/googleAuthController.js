@@ -6,6 +6,13 @@ const User = require("../models/User");
 
 const googleLogin = async (req, res) => {
   try {
+    if (!admin) {
+      return res.status(503).json({
+        success: false,
+        message: "Google login is not configured on the server.",
+      });
+    }
+
     const { idToken } = req.body;
 
     // Validate Firebase ID token
