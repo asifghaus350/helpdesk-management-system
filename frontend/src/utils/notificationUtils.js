@@ -1,11 +1,66 @@
-export const getNotifications = () => {
-  return (
-    JSON.parse(
-      localStorage.getItem("notifications")
-    ) || []
-  );
+// Notifications are stored per logged-in user so people
+// sharing a browser don't see each other's notifications.
+
+const storageKey = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    return `notifications:${user?.id || "guest"}`;
+  } catch {
+    return "notifications:guest";
+  }
 };
 
+const saveNotifications = (notifications) => {
+  localStorage.setItem(
+    storageKey(),
+    JSON.stringify(notifications)
+  );
+
+  window.dispatchEvent(
+    new Event("notificationsUpdated")
+  );
+
+  return notifications;
+};
+
+export const getNotifications = () => {
+  try {
+    return (
+      JSON.parse(localStorage.getItem(storageKey())) || []
+    );
+  } catch {
+    return [];
+  }
+};
+
+// =========================
+// DISPLAY TIME
+// =========================
+
+export const formatNotificationTime = (notification) => {
+  // Older notifications only had a fixed "Just now" label
+  if (!notification.createdAt) {
+    return notification.time || "";
+  }
+
+  const seconds = Math.floor(
+    (Date.now() - new Date(notification.createdAt).getTime()) /
+      1000
+  );
+
+  if (seconds < 60) return "Just now";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+
+  return new Date(notification.createdAt).toLocaleDateString();
+};
 
 // =========================
 // ADD NOTIFICATION
@@ -17,19 +72,14 @@ export const addNotification = (
 ) => {
 
   // Get saved application settings
-  const savedSettings =
-    localStorage.getItem("settings");
+  let settings;
 
-  const settings = savedSettings
-    ? JSON.parse(savedSettings)
-    : {
-        emailNotifications: true,
-        ticketNotifications: true,
-        userNotifications: true,
-        compactMode: false,
-        theme: "light",
-      };
-
+  try {
+    settings =
+      JSON.parse(localStorage.getItem("settings")) || {};
+  } catch {
+    settings = {};
+  }
 
   // =========================
   // CHECK NOTIFICATION SETTINGS
@@ -49,122 +99,58 @@ export const addNotification = (
     return null;
   }
 
-
   // =========================
   // CREATE NOTIFICATION
   // =========================
-
-  const notifications = getNotifications();
 
   const newNotification = {
     id: Date.now(),
     message,
     type,
-    time: "Just now",
+    createdAt: new Date().toISOString(),
     read: false,
   };
 
-  const updatedNotifications = [
-    newNotification,
-    ...notifications,
-  ];
-
-  localStorage.setItem(
-    "notifications",
-    JSON.stringify(updatedNotifications)
-  );
-
-  window.dispatchEvent(
-    new Event("notificationsUpdated")
+  // Keep the list bounded
+  saveNotifications(
+    [newNotification, ...getNotifications()].slice(0, 50)
   );
 
   return newNotification;
 };
 
-
 // =========================
 // MARK ONE AS READ
 // =========================
 
-export const markNotificationAsRead = (id) => {
-
-  const notifications = getNotifications();
-
-  const updatedNotifications =
-    notifications.map(
-      (notification) =>
-        notification.id === id
-          ? {
-              ...notification,
-              read: true,
-            }
-          : notification
-    );
-
-  localStorage.setItem(
-    "notifications",
-    JSON.stringify(updatedNotifications)
+export const markNotificationAsRead = (id) =>
+  saveNotifications(
+    getNotifications().map((notification) =>
+      notification.id === id
+        ? { ...notification, read: true }
+        : notification
+    )
   );
-
-  window.dispatchEvent(
-    new Event("notificationsUpdated")
-  );
-
-  return updatedNotifications;
-};
-
 
 // =========================
 // DELETE NOTIFICATION
 // =========================
 
-export const deleteNotification = (id) => {
-
-  const notifications = getNotifications();
-
-  const updatedNotifications =
-    notifications.filter(
-      (notification) =>
-        notification.id !== id
-    );
-
-  localStorage.setItem(
-    "notifications",
-    JSON.stringify(updatedNotifications)
+export const deleteNotification = (id) =>
+  saveNotifications(
+    getNotifications().filter(
+      (notification) => notification.id !== id
+    )
   );
-
-  window.dispatchEvent(
-    new Event("notificationsUpdated")
-  );
-
-  return updatedNotifications;
-};
-
 
 // =========================
 // MARK ALL AS READ
 // =========================
 
-export const markAllNotificationsAsRead = () => {
-
-  const notifications = getNotifications();
-
-  const updatedNotifications =
-    notifications.map(
-      (notification) => ({
-        ...notification,
-        read: true,
-      })
-    );
-
-  localStorage.setItem(
-    "notifications",
-    JSON.stringify(updatedNotifications)
+export const markAllNotificationsAsRead = () =>
+  saveNotifications(
+    getNotifications().map((notification) => ({
+      ...notification,
+      read: true,
+    }))
   );
-
-  window.dispatchEvent(
-    new Event("notificationsUpdated")
-  );
-
-  return updatedNotifications;
-};

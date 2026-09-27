@@ -14,7 +14,9 @@ const {
 
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    // Role is never taken from the public request —
+    // admins change roles through /api/users.
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -40,7 +42,7 @@ const registerUser = async (req, res) => {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
-      role: role || "User",
+      role: "User",
     });
 
     const userResponse = {
@@ -172,6 +174,7 @@ const getMe = async (req, res) => {
         status: user.status,
         phone: user.phone,
         department: user.department,
+        profilePhoto: user.profilePhoto,
       },
     });
   } catch (error) {
