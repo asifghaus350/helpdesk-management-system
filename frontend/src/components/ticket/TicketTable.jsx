@@ -1,19 +1,80 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  Inbox,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  X,
+} from "lucide-react";
+
 import DeleteModal from "../ui/DeleteModal";
 import {
   getStoredUser,
   canEditTicket,
   canDeleteTicket,
 } from "../../utils/auth";
+import { timeAgo, initials } from "../../utils/format";
+
+// =========================
+// STYLE MAPS
+// =========================
+
+const STATUS_TABS = ["", "Open", "In Progress", "Closed"];
+
+const statusStyles = {
+  Open: {
+    pill: "bg-blue-50 text-blue-700 ring-blue-100",
+    dot: "bg-blue-500",
+  },
+  "In Progress": {
+    pill: "bg-amber-50 text-amber-700 ring-amber-100",
+    dot: "bg-amber-500",
+  },
+  Closed: {
+    pill: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    dot: "bg-emerald-500",
+  },
+};
+
+const priorityStyles = {
+  High: "text-red-600 bg-red-500",
+  Medium: "text-amber-600 bg-amber-500",
+  Low: "text-emerald-600 bg-emerald-500",
+};
+
+const avatarColors = [
+  "bg-blue-100 text-blue-700",
+  "bg-violet-100 text-violet-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-cyan-100 text-cyan-700",
+];
+
+// Same name always gets the same avatar color
+const avatarColor = (name = "") => {
+  const hash = [...name].reduce(
+    (sum, char) => sum + char.charCodeAt(0),
+    0
+  );
+
+  return avatarColors[hash % avatarColors.length];
+};
 
 function TicketTable({
   search,
   status,
   priority,
   category,
+  onStatusChange,
+  onClearFilters,
 }) {
+  const navigate = useNavigate();
+
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
@@ -44,56 +105,52 @@ function TicketTable({
   // FETCH TICKETS
   // =========================
 
-  const fetchTickets = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-      const token = localStorage.getItem("token");
+        const token = localStorage.getItem("token");
 
-      if (!token) {
-        setError("Authentication required. Please login.");
-        return;
-      }
-
-      const response = await fetch(
-        "http://localhost:5000/api/tickets",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        if (!token) {
+          setError("Authentication required. Please login.");
+          return;
         }
-      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to fetch tickets"
+        const response = await fetch(
+          "http://localhost:5000/api/tickets",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to fetch tickets"
+          );
+        }
+
+        setTickets(data.tickets || []);
+      } catch (error) {
+        console.error("Fetch tickets error:", error);
+
+        setError(
+          error.message ||
+            "Unable to load tickets."
+        );
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setTickets(data.tickets || []);
-    } catch (error) {
-      console.error("Fetch tickets error:", error);
-
-      setError(
-        error.message ||
-          "Unable to load tickets."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
- useEffect(() => {
-  const loadTickets = async () => {
-    await fetchTickets();
-  };
-
-  loadTickets();
-}, []);
+    fetchTickets();
+  }, []);
 
   // =========================
   // DELETE TICKET
@@ -128,32 +185,17 @@ function TicketTable({
         );
       }
 
-      // Remove deleted ticket from UI
-      const updatedTickets = tickets.filter(
-        (ticket) =>
-          ticket.ticketId !== selectedTicket
+      // Remove deleted ticket from UI.
+      // The current page is clamped below, so no reset needed.
+      setTickets((prev) =>
+        prev.filter(
+          (ticket) =>
+            ticket.ticketId !== selectedTicket
+        )
       );
-
-      setTickets(updatedTickets);
 
       setIsDeleteOpen(false);
       setSelectedTicket(null);
-
-      // Fix pagination after deletion
-      const totalPages = Math.ceil(
-        updatedTickets.length / ticketsPerPage
-      );
-
-      if (
-        currentPage > totalPages &&
-        totalPages > 0
-      ) {
-        setCurrentPage(totalPages);
-      }
-
-      if (updatedTickets.length === 0) {
-        setCurrentPage(1);
-      }
     } catch (error) {
       console.error("Delete ticket error:", error);
 
@@ -168,44 +210,59 @@ function TicketTable({
   // SEARCH + FILTER
   // =========================
 
-  const filteredTickets = tickets.filter(
-    (ticket) => {
-      const searchText =
-        search.toLowerCase();
+  const searchText = search.toLowerCase();
 
-      const matchesSearch =
-        ticket.ticketId
-          ?.toLowerCase()
-          .includes(searchText) ||
-        ticket.title
-          ?.toLowerCase()
-          .includes(searchText) ||
-        ticket.description
-          ?.toLowerCase()
-          .includes(searchText) ||
-        ticket.engineer
-          ?.toLowerCase()
-          .includes(searchText);
+  // Everything except status, so the status tabs can show counts
+  const matchingTickets = tickets.filter((ticket) => {
+    const matchesSearch =
+      ticket.ticketId
+        ?.toLowerCase()
+        .includes(searchText) ||
+      ticket.title
+        ?.toLowerCase()
+        .includes(searchText) ||
+      ticket.description
+        ?.toLowerCase()
+        .includes(searchText) ||
+      ticket.engineer
+        ?.toLowerCase()
+        .includes(searchText);
 
-      const matchesStatus =
-        status === "" ||
-        ticket.status === status;
+    const matchesPriority =
+      priority === "" ||
+      ticket.priority === priority;
 
-      const matchesPriority =
-        priority === "" ||
-        ticket.priority === priority;
+    const matchesCategory =
+      category === "" ||
+      ticket.category === category;
 
-      const matchesCategory =
-        category === "" ||
-        ticket.category === category;
+    return (
+      matchesSearch &&
+      matchesPriority &&
+      matchesCategory
+    );
+  });
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority &&
-        matchesCategory
-      );
-    }
+  const statusCounts = STATUS_TABS.reduce(
+    (counts, tab) => ({
+      ...counts,
+      [tab]: tab
+        ? matchingTickets.filter(
+            (ticket) => ticket.status === tab
+          ).length
+        : matchingTickets.length,
+    }),
+    {}
+  );
+
+  const filteredTickets = status
+    ? matchingTickets.filter(
+        (ticket) => ticket.status === status
+      )
+    : matchingTickets;
+
+  const hasFilters = Boolean(
+    search || status || priority || category
   );
 
   // =========================
@@ -222,18 +279,72 @@ function TicketTable({
       ? Math.min(currentPage, totalPages)
       : 1;
 
-  const indexOfLastTicket =
-    safeCurrentPage * ticketsPerPage;
-
   const indexOfFirstTicket =
-    indexOfLastTicket -
-    ticketsPerPage;
+    (safeCurrentPage - 1) * ticketsPerPage;
 
   const currentTickets =
     filteredTickets.slice(
       indexOfFirstTicket,
-      indexOfLastTicket
+      indexOfFirstTicket + ticketsPerPage
     );
+
+  // Up to 5 page buttons around the current page
+  const firstPageButton = Math.max(
+    1,
+    Math.min(safeCurrentPage - 2, totalPages - 4)
+  );
+
+  const pageButtons = Array.from(
+    { length: Math.min(5, totalPages) },
+    (_, index) => firstPageButton + index
+  );
+
+  // =========================
+  // STATUS TABS
+  // =========================
+
+  const statusTabs = (
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-4">
+      {STATUS_TABS.map((tab) => {
+        const isActive = status === tab;
+
+        return (
+          <button
+            key={tab || "all"}
+            type="button"
+            onClick={() => onStatusChange?.(tab)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap border transition ${
+              isActive
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                : "bg-white border-slate-200 text-slate-600 hover:border-blue-200 hover:text-blue-600"
+            }`}
+          >
+            {tab && (
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isActive
+                    ? "bg-white"
+                    : statusStyles[tab].dot
+                }`}
+              />
+            )}
+
+            {tab || "All Tickets"}
+
+            <span
+              className={`min-w-6 px-1.5 py-0.5 rounded-md text-xs font-semibold ${
+                isActive
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {loading ? "–" : statusCounts[tab]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   // =========================
   // LOADING
@@ -241,14 +352,25 @@ function TicketTable({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl shadow-md p-10 text-center text-gray-500">
-        Loading tickets...
-      </div>
+      <>
+        {statusTabs}
+
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3 animate-pulse">
+          {[1, 2, 3, 4, 5].map((row) => (
+            <div
+              key={row}
+              className="h-14 rounded-xl bg-slate-100"
+            />
+          ))}
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      {statusTabs}
+
       {/* Error Message */}
 
       {error && (
@@ -257,249 +379,310 @@ function TicketTable({
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-md overflow-x-auto">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
 
-        {/* Table */}
+        {currentTickets.length === 0 ? (
 
-        <table className="w-full">
+          /* =========================
+              EMPTY STATE
+          ========================= */
 
-          <thead className="bg-slate-100">
+          <div className="py-16 px-6 flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
+              <Inbox size={26} />
+            </div>
 
-            <tr>
+            <p className="text-base font-semibold text-slate-800">
+              {hasFilters
+                ? "No tickets match your filters"
+                : "No tickets yet"}
+            </p>
 
-              <th className="text-left p-4">
-                Ticket ID
-              </th>
+            <p className="text-sm text-slate-500 mt-1 max-w-sm">
+              {hasFilters
+                ? "Try a different search or clear the filters to see all tickets."
+                : "Create your first support ticket to get started."}
+            </p>
 
-              <th className="text-left p-4">
-                Title
-              </th>
-
-              <th className="text-left p-4">
-                Category
-              </th>
-
-              <th className="text-left p-4">
-                Priority
-              </th>
-
-              <th className="text-left p-4">
-                Status
-              </th>
-
-              <th className="text-left p-4">
-                Engineer
-              </th>
-
-              <th className="text-center p-4">
-                Actions
-              </th>
-
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {currentTickets.length === 0 ? (
-
-              <tr>
-
-                <td
-                  colSpan="7"
-                  className="text-center py-10 text-gray-500"
-                >
-                  No tickets found.
-                </td>
-
-              </tr>
-
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <X size={16} />
+                Clear filters
+              </button>
             ) : (
-
-              currentTickets.map(
-                (ticket) => (
-
-                  <tr
-                    key={ticket.ticketId}
-                    className="border-t hover:bg-slate-50 transition"
-                  >
-
-                    {/* Ticket ID */}
-
-                    <td className="p-4 font-medium">
-                      {ticket.ticketId}
-                    </td>
-
-                    {/* Title */}
-
-                    <td className="p-4">
-                      {ticket.title}
-                    </td>
-
-                    {/* Category */}
-
-                    <td className="p-4">
-                      {ticket.category}
-                    </td>
-
-                    {/* Priority */}
-
-                    <td className="p-4">
-
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          ticket.priority ===
-                          "High"
-                            ? "bg-red-100 text-red-600"
-                            : ticket.priority ===
-                              "Medium"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-green-100 text-green-600"
-                        }`}
-                      >
-                        {ticket.priority}
-                      </span>
-
-                    </td>
-
-                    {/* Status */}
-
-                    <td className="p-4">
-
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          ticket.status ===
-                          "Open"
-                            ? "bg-blue-100 text-blue-700"
-                            : ticket.status ===
-                              "In Progress"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {ticket.status}
-                      </span>
-
-                    </td>
-
-                    {/* Engineer */}
-
-                    <td className="p-4">
-                      {ticket.engineer ||
-                        "Unassigned"}
-                    </td>
-
-                    {/* Actions */}
-
-                    <td className="p-4">
-
-                      <div className="flex justify-center gap-4">
-
-                        {/* View */}
-
-                        <Link
-                          to={`/tickets/${ticket.ticketId}`}
-                          className="text-blue-600 hover:text-blue-800"
-                          title="View Ticket"
-                        >
-                          <Eye size={18} />
-                        </Link>
-
-                        {/* Edit: Admin, or assigned Engineer */}
-
-                        {canEditTicket(ticket, currentUser) && (
-                          <Link
-                            to={`/tickets/edit/${ticket.ticketId}`}
-                            className="text-green-600 hover:text-green-800"
-                            title="Edit Ticket"
-                          >
-                            <Pencil size={18} />
-                          </Link>
-                        )}
-
-                        {/* Delete: Admin only */}
-
-                        {canDeleteTicket(currentUser) && (
-                          <button
-                            onClick={() => {
-                              setSelectedTicket(
-                                ticket.ticketId
-                              );
-
-                              setIsDeleteOpen(true);
-                            }}
-                            className="text-red-600 hover:text-red-800"
-                            title="Delete Ticket"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-
-                      </div>
-
-                    </td>
-
-                  </tr>
-
-                )
-              )
-
+              <Link
+                to="/tickets/create"
+                className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+              >
+                <Plus size={16} />
+                Create Ticket
+              </Link>
             )}
-
-          </tbody>
-
-        </table>
-
-        {/* Pagination */}
-
-        {filteredTickets.length > 0 && (
-
-          <div className="flex items-center justify-between px-6 py-4 border-t">
-
-            <button
-              onClick={() =>
-                setCurrentPage(
-                  (prev) =>
-                    Math.max(
-                      prev - 1,
-                      1
-                    )
-                )
-              }
-              disabled={
-                safeCurrentPage === 1
-              }
-              className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-            >
-              Previous
-            </button>
-
-            <span className="text-sm font-medium">
-              Page {safeCurrentPage} of{" "}
-              {totalPages}
-            </span>
-
-            <button
-              onClick={() =>
-                setCurrentPage(
-                  (prev) =>
-                    Math.min(
-                      prev + 1,
-                      totalPages
-                    )
-                )
-              }
-              disabled={
-                safeCurrentPage ===
-                totalPages
-              }
-              className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-            >
-              Next
-            </button>
-
           </div>
 
+        ) : (
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-205">
+
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  {[
+                    "Ticket",
+                    "Category",
+                    "Priority",
+                    "Status",
+                    "Engineer",
+                    "Updated",
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                    >
+                      {heading}
+                    </th>
+                  ))}
+
+                  <th className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {currentTickets.map((ticket) => {
+                  const statusStyle =
+                    statusStyles[ticket.status] ||
+                    statusStyles.Open;
+
+                  const [priorityText, priorityDot] = (
+                    priorityStyles[ticket.priority] ||
+                    "text-slate-600 bg-slate-400"
+                  ).split(" ");
+
+                  return (
+                    <tr
+                      key={ticket.ticketId}
+                      onClick={() =>
+                        navigate(`/tickets/${ticket.ticketId}`)
+                      }
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+
+                      {/* Ticket */}
+
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-semibold text-slate-800 truncate max-w-70">
+                          {ticket.title}
+                        </p>
+
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          #{ticket.ticketId}
+                          {ticket.createdBy?.name &&
+                            ` · by ${ticket.createdBy.name}`}
+                        </p>
+                      </td>
+
+                      {/* Category */}
+
+                      <td className="px-5 py-4">
+                        <span className="inline-flex px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-medium whitespace-nowrap">
+                          {ticket.category}
+                        </span>
+                      </td>
+
+                      {/* Priority */}
+
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex items-center gap-2 text-sm font-medium ${priorityText}`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${priorityDot}`}
+                          />
+                          {ticket.priority}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ring-inset whitespace-nowrap ${statusStyle.pill}`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}
+                          />
+                          {ticket.status}
+                        </span>
+                      </td>
+
+                      {/* Engineer */}
+
+                      <td className="px-5 py-4">
+                        {ticket.engineer ? (
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(
+                                ticket.engineer
+                              )}`}
+                            >
+                              {initials(ticket.engineer)}
+                            </span>
+
+                            <span className="text-sm text-slate-700 truncate max-w-35">
+                              {ticket.engineer}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-400">
+                            <span className="w-8 h-8 rounded-full border-2 border-dashed border-slate-300" />
+                            Unassigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Updated */}
+
+                      <td className="px-5 py-4 text-sm text-slate-500 whitespace-nowrap">
+                        {timeAgo(
+                          ticket.updatedAt || ticket.createdAt
+                        )}
+                      </td>
+
+                      {/* Actions */}
+
+                      <td
+                        className="px-5 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex justify-end gap-1">
+
+                          {/* View */}
+
+                          <Link
+                            to={`/tickets/${ticket.ticketId}`}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition"
+                            title="View Ticket"
+                            aria-label="View Ticket"
+                          >
+                            <Eye size={17} />
+                          </Link>
+
+                          {/* Edit: Admin, or assigned Engineer */}
+
+                          {canEditTicket(ticket, currentUser) && (
+                            <Link
+                              to={`/tickets/edit/${ticket.ticketId}`}
+                              className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition"
+                              title="Edit Ticket"
+                              aria-label="Edit Ticket"
+                            >
+                              <Pencil size={17} />
+                            </Link>
+                          )}
+
+                          {/* Delete: Admin only */}
+
+                          {canDeleteTicket(currentUser) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTicket(
+                                  ticket.ticketId
+                                );
+
+                                setIsDeleteOpen(true);
+                              }}
+                              className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition"
+                              title="Delete Ticket"
+                              aria-label="Delete Ticket"
+                            >
+                              <Trash2 size={17} />
+                            </button>
+                          )}
+
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })}
+              </tbody>
+
+            </table>
+          </div>
+
+        )}
+
+        {/* =========================
+            PAGINATION
+        ========================= */}
+
+        {filteredTickets.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-slate-100">
+
+            <p className="text-sm text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-700">
+                {indexOfFirstTicket + 1}–
+                {indexOfFirstTicket + currentTickets.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-700">
+                {filteredTickets.length}
+              </span>{" "}
+              tickets
+            </p>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage(safeCurrentPage - 1)
+                  }
+                  disabled={safeCurrentPage === 1}
+                  aria-label="Previous page"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={17} />
+                </button>
+
+                {pageButtons.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-9 h-9 rounded-lg text-sm font-medium transition ${
+                      page === safeCurrentPage
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage(safeCurrentPage + 1)
+                  }
+                  disabled={safeCurrentPage === totalPages}
+                  aria-label="Next page"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={17} />
+                </button>
+              </div>
+            )}
+
+          </div>
         )}
 
       </div>

@@ -8,12 +8,26 @@ import {
   MessageSquare,
   Trash2,
   PlusCircle,
+  ArrowRight,
 } from "lucide-react";
 
-function TicketActivity({ ticketId }) {
+import { timeAgo } from "../../utils/format";
+
+// Actions whose old/new values are worth showing as "A → B".
+// For the others (e.g. a comment's full text) the message says enough.
+const CHANGE_ACTIONS = [
+  "Ticket Assigned",
+  "Priority Changed",
+  "Status Changed",
+];
+
+const INITIAL_VISIBLE = 6;
+
+function TicketActivity({ ticketId, refreshKey = 0 }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   // =========================
   // GET ACTIVITY ICON
@@ -22,30 +36,30 @@ function TicketActivity({ ticketId }) {
   const getActivityIcon = (action) => {
     switch (action) {
       case "Ticket Created":
-        return <PlusCircle size={18} />;
+        return <PlusCircle size={15} />;
 
       case "Ticket Updated":
-        return <Edit size={18} />;
+        return <Edit size={15} />;
 
       case "Ticket Assigned":
-        return <UserPlus size={18} />;
+        return <UserPlus size={15} />;
 
       case "Priority Changed":
-        return <AlertCircle size={18} />;
+        return <AlertCircle size={15} />;
 
       case "Status Changed":
-        return <CheckCircle size={18} />;
+        return <CheckCircle size={15} />;
 
       case "Comment Added":
       case "Comment Updated":
       case "Comment Deleted":
-        return <MessageSquare size={18} />;
+        return <MessageSquare size={15} />;
 
       case "Ticket Deleted":
-        return <Trash2 size={18} />;
+        return <Trash2 size={15} />;
 
       default:
-        return <Activity size={18} />;
+        return <Activity size={15} />;
     }
   };
 
@@ -56,27 +70,27 @@ function TicketActivity({ ticketId }) {
   const getActivityStyle = (action) => {
     switch (action) {
       case "Ticket Created":
-        return "bg-green-100 text-green-600";
+        return "bg-emerald-50 text-emerald-600 ring-emerald-100";
 
       case "Ticket Assigned":
-        return "bg-blue-100 text-blue-600";
+        return "bg-blue-50 text-blue-600 ring-blue-100";
 
       case "Priority Changed":
-        return "bg-red-100 text-red-600";
+        return "bg-red-50 text-red-600 ring-red-100";
 
       case "Status Changed":
-        return "bg-yellow-100 text-yellow-600";
+        return "bg-amber-50 text-amber-600 ring-amber-100";
 
       case "Comment Added":
       case "Comment Updated":
       case "Comment Deleted":
-        return "bg-purple-100 text-purple-600";
+        return "bg-violet-50 text-violet-600 ring-violet-100";
 
       case "Ticket Deleted":
-        return "bg-red-100 text-red-600";
+        return "bg-red-50 text-red-600 ring-red-100";
 
       default:
-        return "bg-slate-100 text-slate-600";
+        return "bg-slate-50 text-slate-600 ring-slate-100";
     }
   };
 
@@ -89,7 +103,6 @@ function TicketActivity({ ticketId }) {
 
     const loadActivities = async () => {
       try {
-        setLoading(true);
         setError("");
 
         const token = localStorage.getItem("token");
@@ -151,194 +164,166 @@ function TicketActivity({ ticketId }) {
     return () => {
       cancelled = true;
     };
-  }, [ticketId]);
+  }, [ticketId, refreshKey]);
 
-  // =========================
-  // LOADING
-  // =========================
-
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 mt-8">
-
-        <div className="flex items-center gap-2 mb-5">
-
-          <Activity
-            size={21}
-            className="text-blue-600"
-          />
-
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
-            Activity History
-          </h2>
-
-        </div>
-
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Loading activity history...
-        </p>
-
-      </div>
-    );
-  }
+  const visibleActivities = showAll
+    ? activities
+    : activities.slice(0, INITIAL_VISIBLE);
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 mt-8">
+    <section className="bg-white border border-slate-200 rounded-2xl shadow-sm">
 
       {/* =========================
           HEADER
       ========================= */}
 
-      <div className="flex items-center justify-between mb-6">
-
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-2">
+          <Activity size={18} className="text-slate-400" />
 
-          <Activity
-            size={21}
-            className="text-blue-600"
-          />
-
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
-            Activity History
+          <h2 className="text-base font-semibold text-slate-800">
+            Activity
           </h2>
-
         </div>
 
-        <span className="text-sm text-slate-500 dark:text-slate-400">
-          {activities.length}{" "}
-          {activities.length === 1
-            ? "activity"
-            : "activities"}
-        </span>
-
+        {!loading && (
+          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+            {activities.length}
+          </span>
+        )}
       </div>
 
-      {/* =========================
-          ERROR
-      ========================= */}
+      <div className="px-5 py-4">
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm">
-          {error}
-        </div>
-      )}
+        {/* LOADING */}
 
-      {/* =========================
-          EMPTY STATE
-      ========================= */}
-
-      {!error && activities.length === 0 && (
-        <div className="border border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center">
-
-          <Activity
-            size={32}
-            className="mx-auto text-slate-300 dark:text-slate-500 mb-3"
-          />
-
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            No activity history available.
-          </p>
-
-        </div>
-      )}
-
-      {/* =========================
-          ACTIVITY TIMELINE
-      ========================= */}
-
-      {!error && activities.length > 0 && (
-        <div className="relative">
-
-          {/* Timeline Line */}
-
-          <div className="absolute left-5 top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-600" />
-
-          <div className="space-y-6">
-
-            {activities.map((activity) => (
-
-              <div
-                key={activity._id}
-                className="relative flex gap-4"
-              >
-
-                {/* Icon */}
-
-                <div
-                  className={`relative z-10 w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${getActivityStyle(
-                    activity.action
-                  )}`}
-                >
-                  {getActivityIcon(
-                    activity.action
-                  )}
+        {loading && (
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map((row) => (
+              <div key={row} className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-slate-100" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 rounded bg-slate-100 w-2/3" />
+                  <div className="h-3 rounded bg-slate-100 w-1/3" />
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-                {/* Content */}
+        {/* ERROR */}
 
-                <div className="flex-1 min-w-0">
+        {!loading && error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2.5 rounded-xl text-sm">
+            {error}
+          </div>
+        )}
 
-                  <div className="flex flex-wrap items-center gap-2">
+        {/* EMPTY */}
 
-                    <p className="font-semibold text-slate-800 dark:text-white">
-                      {activity.action}
+        {!loading && !error && activities.length === 0 && (
+          <p className="text-sm text-slate-500 text-center py-4">
+            No activity yet.
+          </p>
+        )}
+
+        {/* TIMELINE */}
+
+        {!loading && !error && activities.length > 0 && (
+          <ol className="relative">
+            {visibleActivities.map((activity, index) => {
+              const isLast =
+                index === visibleActivities.length - 1;
+
+              const showChange =
+                CHANGE_ACTIONS.includes(activity.action) &&
+                (activity.oldValue || activity.newValue);
+
+              return (
+                <li
+                  key={activity._id}
+                  className="relative flex gap-3 pb-5 last:pb-0"
+                >
+                  {/* Connector line */}
+
+                  {!isLast && (
+                    <span className="absolute left-3.5 top-8 bottom-0 w-px bg-slate-200" />
+                  )}
+
+                  {/* Icon */}
+
+                  <span
+                    className={`relative z-10 w-7 h-7 shrink-0 rounded-full ring-1 flex items-center justify-center ${getActivityStyle(
+                      activity.action
+                    )}`}
+                  >
+                    {getActivityIcon(activity.action)}
+                  </span>
+
+                  {/* Content */}
+
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <p className="text-sm text-slate-700 leading-snug">
+                      <span className="font-semibold text-slate-800">
+                        {activity.user?.name || "System"}
+                      </span>{" "}
+                      <span className="text-slate-500">
+                        {activity.action.toLowerCase()}
+                      </span>
                     </p>
 
-                    {activity.user?.name && (
-                      <span className="text-sm text-slate-500 dark:text-slate-400">
-                        by {activity.user.name}
-                      </span>
+                    {showChange && (
+                      <p className="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs">
+                        {activity.oldValue && (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                            {activity.oldValue}
+                          </span>
+                        )}
+
+                        {activity.oldValue && activity.newValue && (
+                          <ArrowRight size={12} className="text-slate-400" />
+                        )}
+
+                        {activity.newValue && (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-medium">
+                            {activity.newValue}
+                          </span>
+                        )}
+                      </p>
                     )}
 
+                    <p
+                      className="text-xs text-slate-400 mt-1"
+                      title={
+                        activity.createdAt
+                          ? new Date(activity.createdAt).toLocaleString()
+                          : ""
+                      }
+                    >
+                      {timeAgo(activity.createdAt)}
+                    </p>
                   </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
 
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-                    {activity.message}
-                  </p>
+        {!loading &&
+          activities.length > INITIAL_VISIBLE && (
+            <button
+              type="button"
+              onClick={() => setShowAll((prev) => !prev)}
+              className="mt-4 w-full text-sm font-medium text-blue-600 hover:text-blue-700 py-2 rounded-lg hover:bg-blue-50 transition"
+            >
+              {showAll
+                ? "Show less"
+                : `Show all ${activities.length} activities`}
+            </button>
+          )}
 
-                  {/* Old / New Values */}
-
-                  {(activity.oldValue ||
-                    activity.newValue) && (
-                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
-
-                      {activity.oldValue && (
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                          From: {activity.oldValue}
-                        </span>
-                      )}
-
-                      {activity.newValue && (
-                        <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                          To: {activity.newValue}
-                        </span>
-                      )}
-
-                    </div>
-                  )}
-
-                  {/* Time */}
-
-                  <p className="text-xs text-slate-400 mt-2">
-                    {activity.createdAt
-                      ? new Date(
-                          activity.createdAt
-                        ).toLocaleString()
-                      : "Unknown time"}
-                  </p>
-
-                </div>
-
-              </div>
-
-            ))}
-
-          </div>
-
-        </div>
-      )}
-
-    </div>
+      </div>
+    </section>
   );
 }
 

@@ -955,9 +955,25 @@ function Profile() {
           {/* COVER */}
 
           <div className="relative h-28 sm:h-36 bg-linear-to-r from-blue-600 to-indigo-600 overflow-hidden">
-            <div className="absolute -right-10 -top-16 w-56 h-56 rounded-full bg-white/10" />
-            <div className="absolute right-40 -bottom-20 w-40 h-40 rounded-full bg-white/10" />
-            <div className="absolute left-1/3 -top-10 w-24 h-24 rounded-full bg-white/5" />
+            {profile.profilePhoto ? (
+              <>
+                {/* Profile photo as a soft, blurred cover */}
+                <img
+                  src={profile.profilePhoto}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover scale-125 blur-md"
+                />
+
+                <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/10 to-transparent" />
+              </>
+            ) : (
+              <>
+                <div className="absolute -right-10 -top-16 w-56 h-56 rounded-full bg-white/10" />
+                <div className="absolute right-40 -bottom-20 w-40 h-40 rounded-full bg-white/10" />
+                <div className="absolute left-1/3 -top-10 w-24 h-24 rounded-full bg-white/5" />
+              </>
+            )}
           </div>
 
           <div className="px-5 sm:px-8 pb-6">

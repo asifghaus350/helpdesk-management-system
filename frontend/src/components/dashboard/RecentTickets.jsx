@@ -1,30 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { Inbox } from "lucide-react";
 
-// =========================
-// RELATIVE TIME
-// =========================
+import { timeAgo } from "../../utils/format";
 
-const timeAgo = (date) => {
-  if (!date) return "—";
-
-  const seconds = Math.floor(
-    (Date.now() - new Date(date).getTime()) / 1000
-  );
-
-  if (seconds < 60) return "Just now";
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-
-  return new Date(date).toLocaleDateString();
-};
 
 function RecentTickets({ tickets = [] }) {
   const navigate = useNavigate();
@@ -138,7 +116,7 @@ function RecentTickets({ tickets = [] }) {
                 {/* Ticket */}
 
                 <td className="py-4 px-6">
-                  <p className="text-sm font-semibold text-slate-800 truncate max-w-[260px]">
+                  <p className="text-sm font-semibold text-slate-800 truncate max-w-65">
                     {ticket.title}
                   </p>
 

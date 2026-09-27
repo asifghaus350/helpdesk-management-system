@@ -5,36 +5,37 @@ import {
   Pencil,
   Trash2,
   X,
+  Check,
+  LoaderCircle,
 } from "lucide-react";
 
-function TicketComments({ ticketId }) {
+import { getStoredUser } from "../../utils/auth";
+import { timeAgo, initials } from "../../utils/format";
+
+const MAX_LENGTH = 2000;
+
+const roleBadges = {
+  Admin: "bg-violet-50 text-violet-700",
+  Engineer: "bg-amber-50 text-amber-700",
+};
+
+const sameId = (a, b) =>
+  !!a && !!b && a.toString() === b.toString();
+
+function TicketComments({ ticketId, onChange }) {
   const [comments, setComments] = useState([]);
   const [message, setMessage] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editMessage, setEditMessage] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [error, setError] = useState("");
 
-  // =========================
-  // GET CURRENT USER
-  // =========================
-
-  const getCurrentUser = () => {
-    try {
-      const savedUser = localStorage.getItem("user");
-
-      if (!savedUser) {
-        return null;
-      }
-
-      return JSON.parse(savedUser);
-    } catch (error) {
-      console.error("Current user error:", error);
-      return null;
-    }
-  };
+  const currentUser = getStoredUser();
+  const currentUserId = currentUser?._id || currentUser?.id;
 
   // =========================
   // FETCH COMMENTS
@@ -113,9 +114,9 @@ function TicketComments({ ticketId }) {
   // =========================
 
   const handleAddComment = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
 
-    if (!message.trim()) {
+    if (!message.trim() || submitting) {
       return;
     }
 
@@ -183,6 +184,7 @@ function TicketComments({ ticketId }) {
       }
 
       setMessage("");
+      onChange?.();
     } catch (error) {
       console.error(
         "Add comment error:",
@@ -198,18 +200,22 @@ function TicketComments({ ticketId }) {
     }
   };
 
-  // =========================
-  // START EDIT
-  // =========================
-
-  const handleStartEdit = (comment) => {
-    setEditingId(comment._id);
-    setEditMessage(comment.message || "");
+  // Ctrl/Cmd + Enter sends
+  const handleComposerKeyDown = (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      handleAddComment(e);
+    }
   };
 
   // =========================
-  // CANCEL EDIT
+  // START / CANCEL EDIT
   // =========================
+
+  const handleStartEdit = (comment) => {
+    setConfirmDeleteId(null);
+    setEditingId(comment._id);
+    setEditMessage(comment.message || "");
+  };
 
   const handleCancelEdit = () => {
     setEditingId(null);
@@ -226,6 +232,7 @@ function TicketComments({ ticketId }) {
     }
 
     try {
+      setSavingEdit(true);
       setError("");
 
       const token = localStorage.getItem("token");
@@ -272,6 +279,7 @@ function TicketComments({ ticketId }) {
 
       setEditingId(null);
       setEditMessage("");
+      onChange?.();
     } catch (error) {
       console.error(
         "Update comment error:",
@@ -282,22 +290,17 @@ function TicketComments({ ticketId }) {
         error.message ||
           "Unable to update comment."
       );
+    } finally {
+      setSavingEdit(false);
     }
   };
 
   // =========================
   // DELETE COMMENT
   // =========================
+  // Confirmation happens inline on the comment.
 
   const handleDeleteComment = async (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this comment?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
       setError("");
 
@@ -334,6 +337,8 @@ function TicketComments({ ticketId }) {
           (comment) => comment._id !== id
         )
       );
+
+      onChange?.();
     } catch (error) {
       console.error(
         "Delete comment error:",
@@ -344,6 +349,8 @@ function TicketComments({ ticketId }) {
         error.message ||
           "Unable to delete comment."
       );
+    } finally {
+      setConfirmDeleteId(null);
     }
   };
 
@@ -351,114 +358,47 @@ function TicketComments({ ticketId }) {
   // COMMENT PERMISSION
   // =========================
 
-  const canEditComment = (comment) => {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || !comment.user) {
-      return false;
-    }
-
-    const currentUserId =
-      currentUser._id ||
-      currentUser.id;
-
-    const commentUserId =
-      comment.user._id ||
-      comment.user.id;
-
-    return (
-      currentUserId &&
-      commentUserId &&
-      currentUserId.toString() ===
-        commentUserId.toString()
+  const isOwnComment = (comment) =>
+    sameId(
+      currentUserId,
+      comment.user?._id || comment.user?.id
     );
-  };
 
-  const canDeleteComment = (comment) => {
-    const currentUser = getCurrentUser();
+  const canEditComment = (comment) =>
+    isOwnComment(comment);
 
-    if (!currentUser || !comment.user) {
-      return false;
-    }
+  const canDeleteComment = (comment) =>
+    isOwnComment(comment) ||
+    currentUser?.role === "Admin";
 
-    const currentUserId =
-      currentUser._id ||
-      currentUser.id;
-
-    const commentUserId =
-      comment.user._id ||
-      comment.user.id;
-
-    const isOwner =
-      currentUserId &&
-      commentUserId &&
-      currentUserId.toString() ===
-        commentUserId.toString();
-
-    const isAdmin =
-      currentUser.role === "Admin";
-
-    return isOwner || isAdmin;
-  };
-
-  // =========================
-  // LOADING
-  // =========================
-
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 mt-8">
-
-        <div className="flex items-center gap-2 mb-4">
-
-          <MessageSquare
-            size={20}
-            className="text-blue-600"
-          />
-
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
-            Conversation
-          </h2>
-
-        </div>
-
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Loading comments...
-        </p>
-
-      </div>
-    );
-  }
+  const wasEdited = (comment) =>
+    comment.updatedAt &&
+    comment.createdAt &&
+    new Date(comment.updatedAt).getTime() !==
+      new Date(comment.createdAt).getTime();
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 mt-8">
+    <section className="bg-white border border-slate-200 rounded-2xl shadow-sm">
 
       {/* =========================
           HEADER
       ========================= */}
 
-      <div className="flex items-center justify-between mb-6">
-
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-2">
+          <MessageSquare size={18} className="text-slate-400" />
 
-          <MessageSquare
-            size={21}
-            className="text-blue-600"
-          />
-
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-white">
+          <h2 className="text-base font-semibold text-slate-800">
             Conversation
           </h2>
-
         </div>
 
-        <span className="text-sm text-slate-500 dark:text-slate-400">
-          {comments.length}{" "}
-          {comments.length === 1
-            ? "comment"
-            : "comments"}
-        </span>
-
+        {!loading && (
+          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+            {comments.length}{" "}
+            {comments.length === 1 ? "comment" : "comments"}
+          </span>
+        )}
       </div>
 
       {/* =========================
@@ -466,266 +406,288 @@ function TicketComments({ ticketId }) {
       ========================= */}
 
       {error && (
-        <div className="mb-5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm">
+        <div className="mx-5 mt-4 bg-red-50 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl text-sm">
           {error}
         </div>
       )}
 
       {/* =========================
-          ADD COMMENT
+          COMMENTS LIST
+      ========================= */}
+
+      <div className="px-5 py-4">
+
+        {loading ? (
+
+          <div className="space-y-5 animate-pulse">
+            {[1, 2].map((row) => (
+              <div key={row} className="flex gap-3">
+                <div className="w-9 h-9 rounded-full bg-slate-100" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 rounded bg-slate-100 w-1/4" />
+                  <div className="h-12 rounded-xl bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+        ) : comments.length === 0 ? (
+
+          <div className="py-6 text-center">
+            <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <MessageSquare size={20} />
+            </div>
+
+            <p className="text-sm font-medium text-slate-700 mt-3">
+              No comments yet
+            </p>
+
+            <p className="text-xs text-slate-500 mt-1">
+              Start the conversation below.
+            </p>
+          </div>
+
+        ) : (
+
+          <ul className="space-y-5">
+            {comments.map((comment) => {
+              const isEditing = editingId === comment._id;
+              const isConfirmingDelete =
+                confirmDeleteId === comment._id;
+              const own = isOwnComment(comment);
+              const authorName =
+                comment.user?.name || "Unknown User";
+              const authorRole = comment.user?.role;
+
+              return (
+                <li
+                  key={comment._id}
+                  className="group flex gap-3"
+                >
+                  {/* Avatar */}
+
+                  <span
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      own
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {initials(authorName)}
+                  </span>
+
+                  <div className="flex-1 min-w-0">
+
+                    {/* Meta */}
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                        <span className="text-sm font-semibold text-slate-800 truncate">
+                          {authorName}
+                        </span>
+
+                        {roleBadges[authorRole] && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase ${roleBadges[authorRole]}`}
+                          >
+                            {authorRole}
+                          </span>
+                        )}
+
+                        <span
+                          className="text-xs text-slate-400"
+                          title={
+                            comment.createdAt
+                              ? new Date(comment.createdAt).toLocaleString()
+                              : ""
+                          }
+                        >
+                          {timeAgo(comment.createdAt)}
+                          {wasEdited(comment) && " · edited"}
+                        </span>
+                      </div>
+
+                      {/* Actions (on hover for desktop) */}
+
+                      {!isEditing && !isConfirmingDelete && (
+                        <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                          {canEditComment(comment) && (
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(comment)}
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                              title="Edit comment"
+                              aria-label="Edit comment"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
+
+                          {canDeleteComment(comment) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleCancelEdit();
+                                setConfirmDeleteId(comment._id);
+                              }}
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                              title="Delete comment"
+                              aria-label="Delete comment"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Body */}
+
+                    {isEditing ? (
+
+                      <div className="mt-2">
+                        <textarea
+                          value={editMessage}
+                          onChange={(e) => setEditMessage(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") handleCancelEdit();
+                            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                              handleUpdateComment(comment._id);
+                            }
+                          }}
+                          rows={3}
+                          maxLength={MAX_LENGTH}
+                          autoFocus
+                          className="w-full border border-blue-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-100 resize-y"
+                        />
+
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50"
+                          >
+                            <X size={14} />
+                            Cancel
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateComment(comment._id)}
+                            disabled={!editMessage.trim() || savingEdit}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg text-sm font-medium"
+                          >
+                            {savingEdit ? (
+                              <LoaderCircle size={14} className="animate-spin" />
+                            ) : (
+                              <Check size={14} />
+                            )}
+                            Save
+                          </button>
+                        </div>
+                      </div>
+
+                    ) : (
+
+                      <div
+                        className={`mt-1.5 rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word ${
+                          own
+                            ? "bg-blue-50 text-slate-800"
+                            : "bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        {comment.message}
+                      </div>
+
+                    )}
+
+                    {/* Inline delete confirmation */}
+
+                    {isConfirmingDelete && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                        <span className="text-sm text-red-700">
+                          Delete this comment?
+                        </span>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-3 py-1 rounded-md text-sm text-slate-600 hover:bg-white"
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="px-3 py-1 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+        )}
+      </div>
+
+      {/* =========================
+          COMPOSER
       ========================= */}
 
       <form
         onSubmit={handleAddComment}
-        className="mb-8"
+        className="flex gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/60 rounded-b-2xl"
       >
+        <span className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+          {initials(currentUser?.name || "?")}
+        </span>
 
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Add Comment
-        </label>
+        <div className="flex-1 min-w-0">
+          <div className="bg-white border border-slate-200 rounded-xl focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition">
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              placeholder="Write a reply..."
+              aria-label="Write a comment"
+              rows={3}
+              maxLength={MAX_LENGTH}
+              className="w-full px-3.5 pt-3 pb-1 text-sm text-slate-800 placeholder-slate-400 bg-transparent outline-none resize-none"
+            />
 
-        <textarea
-          value={message}
-          onChange={(e) =>
-            setMessage(e.target.value)
-          }
-          placeholder="Write your comment..."
-          rows={4}
-          maxLength={2000}
-          className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-700 text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-        />
+            <div className="flex items-center justify-between gap-3 px-3 pb-2.5">
+              <span className="text-xs text-slate-400">
+                <span className="hidden sm:inline">
+                  Ctrl + Enter to send ·{" "}
+                </span>
+                {message.length}/{MAX_LENGTH}
+              </span>
 
-        <div className="flex justify-between items-center mt-3">
-
-          <span className="text-xs text-slate-400">
-            {message.length}/2000
-          </span>
-
-          <button
-            type="submit"
-            disabled={
-              submitting ||
-              !message.trim()
-            }
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-medium transition"
-          >
-
-            <Send size={17} />
-
-            {submitting
-              ? "Adding..."
-              : "Add Comment"}
-
-          </button>
-
+              <button
+                type="submit"
+                disabled={submitting || !message.trim()}
+                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition"
+              >
+                {submitting ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <Send size={15} />
+                )}
+                {submitting ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </div>
         </div>
-
       </form>
 
-      {/* =========================
-          COMMENTS LIST
-      ========================= */}
-
-      {comments.length === 0 ? (
-
-        <div className="border border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center">
-
-          <MessageSquare
-            size={32}
-            className="mx-auto text-slate-300 dark:text-slate-500 mb-3"
-          />
-
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            No comments yet.
-          </p>
-
-          <p className="text-xs text-slate-400 mt-1">
-            Start the conversation by adding a comment.
-          </p>
-
-        </div>
-
-      ) : (
-
-        <div className="space-y-4">
-
-          {comments.map((comment) => {
-
-            const isEditing =
-              editingId === comment._id;
-
-            return (
-              <div
-                key={comment._id}
-                className="border border-slate-200 dark:border-slate-600 rounded-xl p-4"
-              >
-
-                {/* =========================
-                    COMMENT HEADER
-                ========================= */}
-
-                <div className="flex justify-between gap-4">
-
-                  <div className="flex items-center gap-3">
-
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold">
-                      {comment.user?.name
-                        ?.charAt(0)
-                        ?.toUpperCase() ||
-                        "U"}
-                    </div>
-
-                    <div>
-
-                      <p className="font-semibold text-slate-800 dark:text-white">
-                        {comment.user?.name ||
-                          "Unknown User"}
-                      </p>
-
-                      <p className="text-xs text-slate-400">
-                        {comment.createdAt
-                          ? new Date(
-                              comment.createdAt
-                            ).toLocaleString()
-                          : "Unknown time"}
-                      </p>
-
-                    </div>
-
-                  </div>
-
-                  {/* =========================
-                      ACTIONS
-                  ========================= */}
-
-                  <div className="flex items-center gap-2">
-
-                    {canEditComment(comment) &&
-                      !isEditing && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleStartEdit(
-                              comment
-                            )
-                          }
-                          className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"
-                          title="Edit comment"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                      )}
-
-                    {canDeleteComment(comment) &&
-                      !isEditing && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteComment(
-                              comment._id
-                            )
-                          }
-                          className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
-                          title="Delete comment"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-
-                  </div>
-
-                </div>
-
-                {/* =========================
-                    COMMENT CONTENT
-                ========================= */}
-
-                <div className="mt-4">
-
-                  {isEditing ? (
-
-                    <div>
-
-                      <textarea
-                        value={editMessage}
-                        onChange={(e) =>
-                          setEditMessage(
-                            e.target.value
-                          )
-                        }
-                        rows={3}
-                        maxLength={2000}
-                        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-700 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      />
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          type="button"
-                          onClick={
-                            handleCancelEdit
-                          }
-                          className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-                        >
-                          <X size={16} />
-                          Cancel
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateComment(
-                              comment._id
-                            )
-                          }
-                          disabled={
-                            !editMessage.trim()
-                          }
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg"
-                        >
-                          Save
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  ) : (
-
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-6">
-                      {comment.message}
-                    </p>
-
-                  )}
-
-                </div>
-
-                {/* =========================
-                    EDITED INDICATOR
-                ========================= */}
-
-                {comment.updatedAt &&
-                  comment.createdAt &&
-                  new Date(
-                    comment.updatedAt
-                  ).getTime() !==
-                    new Date(
-                      comment.createdAt
-                    ).getTime() && (
-                    <p className="text-xs text-slate-400 mt-3">
-                      Edited
-                    </p>
-                  )}
-
-              </div>
-            );
-          })}
-
-        </div>
-
-      )}
-
-    </div>
+    </section>
   );
 }
 
