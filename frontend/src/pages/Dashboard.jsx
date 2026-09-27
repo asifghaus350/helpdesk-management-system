@@ -352,7 +352,7 @@ function Dashboard() {
             <button
               type="button"
               onClick={() => navigate("/tickets/create")}
-              className="flex items-center gap-2 bg-white/95 text-blue-700 font-semibold rounded-xl px-5 py-3.5 hover:bg-blue-50 shadow-sm transition"
+              className="no-dark flex items-center gap-2 bg-white/95 text-blue-700 font-semibold rounded-xl px-5 py-3.5 hover:bg-blue-50 shadow-sm transition"
             >
               <Plus size={18} />
               New Ticket

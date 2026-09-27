@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+
 import Layout from "../components/layout/Layout";
 import TicketForm from "../components/ticket/TicketForm";
 
@@ -7,14 +10,22 @@ function CreateTicket() {
 
       {/* Page Heading */}
 
-      <div className="mb-8">
+      <div className="mb-6">
 
-        <h1 className="text-3xl font-bold text-slate-800">
+        <Link
+          to="/tickets"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-blue-600 transition"
+        >
+          <ArrowLeft size={16} />
+          Back to tickets
+        </Link>
+
+        <h1 className="text-3xl font-bold tracking-tight text-slate-800 mt-3">
           Create Ticket
         </h1>
 
-        <p className="text-gray-500 mt-2">
-          Fill in the details below to create a new support ticket.
+        <p className="text-slate-500 mt-2">
+          Describe the issue and we'll route it to the right engineer.
         </p>
 
       </div>

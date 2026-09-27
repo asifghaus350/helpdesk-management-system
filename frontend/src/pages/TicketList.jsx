@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Plus, X, SlidersHorizontal } from "lucide-react";
 
 import Layout from "../components/layout/Layout";
 import TicketTable from "../components/ticket/TicketTable";
+import { getStoredUser } from "../utils/auth";
+
+const pageDescriptions = {
+  Admin: "View, search and manage all support tickets.",
+  Engineer:
+    "Tickets assigned to you, plus unassigned tickets you can pick up.",
+  User: "Track the support tickets you have raised.",
+};
 
 function TicketList() {
   // =========================
@@ -33,55 +41,7 @@ function TicketList() {
     searchParams.get("category") || ""
   );
 
-  // =========================
-  // THEME
-  // =========================
-
-  const [theme, setTheme] = useState(() => {
-    const savedSettings =
-      localStorage.getItem("settings");
-
-    if (savedSettings) {
-      return (
-        JSON.parse(savedSettings).theme ||
-        "light"
-      );
-    }
-
-    return "light";
-  });
-
-  // =========================
-  // SETTINGS CHANGE
-  // =========================
-
-  useEffect(() => {
-    const handleSettingsChange = () => {
-      const savedSettings =
-        localStorage.getItem("settings");
-
-      if (savedSettings) {
-        const parsedSettings =
-          JSON.parse(savedSettings);
-
-        setTheme(
-          parsedSettings.theme || "light"
-        );
-      }
-    };
-
-    window.addEventListener(
-      "settingsChanged",
-      handleSettingsChange
-    );
-
-    return () => {
-      window.removeEventListener(
-        "settingsChanged",
-        handleSettingsChange
-      );
-    };
-  }, []);
+  const userRole = getStoredUser()?.role || "User";
 
   // =========================
   // SYNC FILTERS WITH URL
@@ -119,55 +79,38 @@ function TicketList() {
     setSearchParams(params);
   };
 
-  // =========================
-  // SEARCH CHANGE
-  // =========================
-
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-
-    setSearch(value);
-    updateFilter("search", value);
+  const filterSetters = {
+    search: setSearch,
+    status: setStatus,
+    priority: setPriority,
+    category: setCategory,
   };
 
-  // =========================
-  // STATUS CHANGE
-  // =========================
-
-  const handleStatusChange = (e) => {
-    const value = e.target.value;
-
-    setStatus(value);
-    updateFilter("status", value);
+  const changeFilter = (key, value) => {
+    filterSetters[key](value);
+    updateFilter(key, value);
   };
 
-  // =========================
-  // PRIORITY CHANGE
-  // =========================
-
-  const handlePriorityChange = (e) => {
-    const value = e.target.value;
-
-    setPriority(value);
-    updateFilter("priority", value);
+  const clearFilters = () => {
+    setSearch("");
+    setStatus("");
+    setPriority("");
+    setCategory("");
+    setSearchParams(new URLSearchParams());
   };
 
-  // =========================
-  // CATEGORY CHANGE
-  // =========================
+  const activeFilterCount = [
+    search,
+    priority,
+    category,
+  ].filter(Boolean).length;
 
-  const handleCategoryChange = (e) => {
-    const value = e.target.value;
-
-    setCategory(value);
-    updateFilter("category", value);
-  };
-
-  // =========================
-  // THEME
-  // =========================
-
-  const isDark = theme === "dark";
+  const selectClass = (value) =>
+    `h-11 border rounded-xl px-3.5 pr-9 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer ${
+      value
+        ? "border-blue-300 bg-blue-50 text-blue-700 font-medium"
+        : "border-slate-200 bg-white text-slate-700"
+    }`;
 
   // =========================
   // PAGE
@@ -180,28 +123,26 @@ function TicketList() {
           HEADING
       ========================= */}
 
-      <div className="mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
 
-        <h1
-          className={`text-3xl font-bold ${
-            isDark
-              ? "text-white"
-              : "text-slate-800"
-          }`}
-        >
-          Ticket Management
-        </h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-800">
+            Ticket Management
+          </h1>
 
-        <p
-          className={`mt-2 ${
-            isDark
-              ? "text-slate-400"
-              : "text-gray-500"
-          }`}
+          <p className="mt-2 text-slate-500">
+            {pageDescriptions[userRole] ||
+              pageDescriptions.User}
+          </p>
+        </div>
+
+        <Link
+          to="/tickets/create"
+          className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl text-sm font-semibold shadow-sm transition shrink-0"
         >
-          View, search and manage all support
-          tickets.
-        </p>
+          <Plus size={18} />
+          Create Ticket
+        </Link>
 
       </div>
 
@@ -209,150 +150,94 @@ function TicketList() {
           SEARCH & FILTERS
       ========================= */}
 
-      <div
-        className={`rounded-2xl shadow-md p-6 mb-8 ${
-          isDark
-            ? "bg-slate-800"
-            : "bg-white"
-        }`}
-      >
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-5">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="flex flex-col lg:flex-row gap-3">
 
           {/* SEARCH */}
 
-          <div className="relative lg:col-span-2">
+          <div className="relative flex-1">
 
             <Search
               size={18}
-              className={`absolute left-3 top-3.5 ${
-                isDark
-                  ? "text-slate-400"
-                  : "text-gray-400"
-              }`}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
             />
 
             <input
-              type="text"
-              placeholder="Search tickets..."
+              type="search"
+              placeholder="Search by ID, title, description or engineer..."
               value={search}
-              onChange={
-                handleSearchChange
+              onChange={(e) =>
+                changeFilter("search", e.target.value)
               }
-              className={`w-full border rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDark
-                  ? "bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-                  : "bg-white border-gray-300 text-slate-800"
-              }`}
+              aria-label="Search tickets"
+              className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm text-slate-800 bg-slate-50 outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
             />
 
           </div>
 
-          {/* STATUS */}
+          <div className="flex flex-wrap items-center gap-3">
 
-          <select
-            value={status}
-            onChange={
-              handleStatusChange
-            }
-            className={`border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
-              isDark
-                ? "bg-slate-700 border-slate-600 text-white"
-                : "bg-white border-gray-300 text-slate-800"
-            }`}
-          >
-            <option value="">
-              All Status
-            </option>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-sm text-slate-500">
+              <SlidersHorizontal size={16} />
+              Filters
+            </span>
 
-            <option value="Open">
-              Open
-            </option>
+            {/* PRIORITY */}
 
-            <option value="In Progress">
-              In Progress
-            </option>
+            <select
+              value={priority}
+              onChange={(e) =>
+                changeFilter("priority", e.target.value)
+              }
+              aria-label="Filter by priority"
+              className={selectClass(priority)}
+            >
+              <option value="">All Priorities</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
 
-            <option value="Closed">
-              Closed
-            </option>
-          </select>
+            {/* CATEGORY */}
 
-          {/* PRIORITY */}
+            <select
+              value={category}
+              onChange={(e) =>
+                changeFilter("category", e.target.value)
+              }
+              aria-label="Filter by category"
+              className={selectClass(category)}
+            >
+              <option value="">All Categories</option>
+              <option value="Bug">Bug</option>
+              <option value="Support">Support</option>
+              <option value="Feature Request">
+                Feature Request
+              </option>
+            </select>
 
-          <select
-            value={priority}
-            onChange={
-              handlePriorityChange
-            }
-            className={`border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
-              isDark
-                ? "bg-slate-700 border-slate-600 text-white"
-                : "bg-white border-gray-300 text-slate-800"
-            }`}
-          >
-            <option value="">
-              All Priority
-            </option>
+            {/* CLEAR */}
 
-            <option value="High">
-              High
-            </option>
+            {(activeFilterCount > 0 || status) && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 h-11 px-3.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X size={16} />
+                Clear
+              </button>
+            )}
 
-            <option value="Medium">
-              Medium
-            </option>
-
-            <option value="Low">
-              Low
-            </option>
-          </select>
-
-          {/* CATEGORY */}
-
-          <select
-            value={category}
-            onChange={
-              handleCategoryChange
-            }
-            className={`border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 ${
-              isDark
-                ? "bg-slate-700 border-slate-600 text-white"
-                : "bg-white border-gray-300 text-slate-800"
-            }`}
-          >
-            <option value="">
-              All Categories
-            </option>
-
-            <option value="Bug">
-              Bug
-            </option>
-
-            <option value="Support">
-              Support
-            </option>
-
-            <option value="Feature Request">
-              Feature Request
-            </option>
-          </select>
-
-          {/* CREATE TICKET */}
-
-          <Link
-            to="/tickets/create"
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center font-semibold transition"
-          >
-            + Create Ticket
-          </Link>
+          </div>
 
         </div>
 
       </div>
 
       {/* =========================
-          TICKET TABLE
+          STATUS TABS + TICKET TABLE
       ========================= */}
 
       <TicketTable
@@ -360,6 +245,10 @@ function TicketList() {
         status={status}
         priority={priority}
         category={category}
+        onStatusChange={(value) =>
+          changeFilter("status", value)
+        }
+        onClearFilters={clearFilters}
       />
 
     </Layout>
