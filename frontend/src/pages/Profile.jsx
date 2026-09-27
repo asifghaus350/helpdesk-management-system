@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
+import { updateStoredUser } from "../utils/auth";
 
 function Profile() {
   const navigate = useNavigate();
@@ -157,21 +158,7 @@ function Profile() {
         });
 
         // Keep Navbar user data synchronized.
-        const storedUser = JSON.parse(
-          localStorage.getItem("user") || "{}"
-        );
-
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...storedUser,
-            ...currentUser,
-          })
-        );
-
-        window.dispatchEvent(
-          new Event("userChanged")
-        );
+        updateStoredUser(currentUser);
 
         // =========================
         // FETCH ROLE-BASED TICKETS
@@ -350,21 +337,8 @@ function Profile() {
             updatedUser.profilePhoto || "",
         }));
 
-        const storedUser = JSON.parse(
-          localStorage.getItem("user") || "{}"
-        );
-
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...storedUser,
-            ...updatedUser,
-          })
-        );
-
-        window.dispatchEvent(
-          new Event("userChanged")
-        );
+        // Keep Navbar user data synchronized.
+        updateStoredUser(updatedUser);
       } catch (error) {
         console.error(
           "Profile photo upload error:",
@@ -439,21 +413,8 @@ function Profile() {
         profilePhoto: "",
       }));
 
-      const storedUser = JSON.parse(
-        localStorage.getItem("user") || "{}"
-      );
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          ...storedUser,
-          ...updatedUser,
-        })
-      );
-
-      window.dispatchEvent(
-        new Event("userChanged")
-      );
+      // Keep Navbar user data synchronized.
+      updateStoredUser(updatedUser);
     } catch (error) {
       console.error(
         "Remove profile photo error:",
@@ -546,21 +507,8 @@ function Profile() {
           prev.profilePhoto,
       }));
 
-      const storedUser = JSON.parse(
-        localStorage.getItem("user") || "{}"
-      );
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          ...storedUser,
-          ...updatedUser,
-        })
-      );
-
-      window.dispatchEvent(
-        new Event("userChanged")
-      );
+      // Keep Navbar user data synchronized.
+      updateStoredUser(updatedUser);
 
       setProfileSuccess(
         "Profile updated successfully."
@@ -735,19 +683,19 @@ function Profile() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-4">
 
         {/* =========================
             PAGE HEADING
         ========================= */}
 
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">
               My Profile
             </h1>
 
-            <p className="text-slate-500 mt-1">
+            <p className="text-slate-500 mt-0.5">
               View and manage your profile information.
             </p>
           </div>
@@ -771,27 +719,27 @@ function Profile() {
             MAIN PROFILE LAYOUT
         ========================= */}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start">
 
           {/* =========================
               LEFT PROFILE SUMMARY
           ========================= */}
 
-          <aside className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+          <aside className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
 
             {/* PHOTO */}
 
             <div className="flex justify-center">
-              <div className="relative w-24 h-24">
+              <div className="relative w-20 h-20">
 
                 {profile.profilePhoto ? (
                   <img
                     src={profile.profilePhoto}
                     alt="Profile"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-sm ring-1 ring-slate-200"
+                    className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-sm ring-1 ring-slate-200"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-semibold shadow-sm ring-4 ring-blue-50">
+                  <div className="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-semibold shadow-sm ring-4 ring-blue-50">
                     {profileInitial}
                   </div>
                 )}
@@ -822,15 +770,15 @@ function Profile() {
             {/* IDENTITY */}
 
             <div className="text-center mt-4">
-              <h2 className="text-lg font-bold text-slate-800">
+              <h2 className="text-base font-bold text-slate-800">
                 {profile.name || "User"}
               </h2>
 
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {roleLabel}
               </p>
 
-              <div className="flex justify-center mt-3">
+              <div className="flex justify-center mt-2">
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                     profile.status === "Active"
@@ -846,7 +794,7 @@ function Profile() {
 
             {/* PHOTO ACTIONS */}
 
-            <div className="flex justify-center flex-wrap gap-3 mt-4">
+            <div className="flex justify-center flex-wrap gap-2 mt-3">
               <label
                 htmlFor="profile-photo"
                 className={`text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer ${
@@ -875,7 +823,7 @@ function Profile() {
               )}
             </div>
 
-            <p className="text-[11px] text-center text-slate-400 mt-2">
+            <p className="text-[10px] text-center text-slate-400 mt-1.5">
               JPG, JPEG, PNG or WebP · Max 5 MB
             </p>
 
@@ -887,7 +835,7 @@ function Profile() {
 
             {/* DIVIDER */}
 
-            <div className="border-t border-slate-100 my-5" />
+            <div className="border-t border-slate-100 my-4" />
 
             {/* COMPACT TICKET STATS */}
 
@@ -898,7 +846,7 @@ function Profile() {
                 onClick={openAllTickets}
                 className="group"
               >
-                <p className="text-xl font-bold text-slate-800 group-hover:text-blue-600 transition">
+                <p className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition">
                   {ticketStats.total}
                 </p>
 
@@ -914,7 +862,7 @@ function Profile() {
                 onClick={openResolvedTickets}
                 className="group border-x border-slate-100"
               >
-                <p className="text-xl font-bold text-slate-800 group-hover:text-green-600 transition">
+                <p className="text-lg font-bold text-slate-800 group-hover:text-green-600 transition">
                   {ticketStats.resolved}
                 </p>
 
@@ -928,7 +876,7 @@ function Profile() {
                 onClick={openTickets}
                 className="group"
               >
-                <p className="text-xl font-bold text-slate-800 group-hover:text-amber-600 transition">
+                <p className="text-lg font-bold text-slate-800 group-hover:text-amber-600 transition">
                   {ticketStats.open}
                 </p>
 
@@ -959,7 +907,7 @@ function Profile() {
                     setError("");
                     setProfileSuccess("");
                   }}
-                  className={`relative py-4 text-sm font-semibold whitespace-nowrap ${
+                  className={`relative py-3.5 text-sm font-semibold whitespace-nowrap ${
                     activeTab === "personal"
                       ? "text-blue-600"
                       : "text-slate-500 hover:text-slate-700"
@@ -979,7 +927,7 @@ function Profile() {
                     setError("");
                     setProfileSuccess("");
                   }}
-                  className={`relative py-4 text-sm font-semibold whitespace-nowrap ${
+                  className={`relative py-3.5 text-sm font-semibold whitespace-nowrap ${
                     activeTab === "password"
                       ? "text-blue-600"
                       : "text-slate-500 hover:text-slate-700"
@@ -999,7 +947,7 @@ function Profile() {
                     setError("");
                     setProfileSuccess("");
                   }}
-                  className={`relative py-4 text-sm font-semibold whitespace-nowrap ${
+                  className={`relative py-3.5 text-sm font-semibold whitespace-nowrap ${
                     activeTab === "preferences"
                       ? "text-blue-600"
                       : "text-slate-500 hover:text-slate-700"
@@ -1022,15 +970,15 @@ function Profile() {
             {activeTab === "personal" && (
               <form
                 onSubmit={handleSave}
-                className="p-5 sm:p-6"
+                className="p-4 sm:p-5"
               >
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
 
                   {/* FULL NAME */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Full Name
                     </label>
 
@@ -1045,7 +993,7 @@ function Profile() {
                         name="name"
                         value={profile.name}
                         onChange={handleChange}
-                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        className="w-full h-11 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
                       />
                     </div>
                   </div>
@@ -1053,7 +1001,7 @@ function Profile() {
                   {/* EMAIL */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Email
                     </label>
 
@@ -1068,7 +1016,7 @@ function Profile() {
                         name="email"
                         value={profile.email}
                         onChange={handleChange}
-                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        className="w-full h-11 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
                       />
                     </div>
                   </div>
@@ -1076,7 +1024,7 @@ function Profile() {
                   {/* PHONE */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Phone
                     </label>
 
@@ -1091,7 +1039,7 @@ function Profile() {
                         name="phone"
                         value={profile.phone}
                         onChange={handleChange}
-                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        className="w-full h-11 border border-slate-300 rounded-xl pl-10 pr-4 text-sm text-slate-700 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
                       />
                     </div>
                   </div>
@@ -1099,7 +1047,7 @@ function Profile() {
                   {/* DEPARTMENT */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Department
                     </label>
 
@@ -1116,15 +1064,15 @@ function Profile() {
                           "Not assigned"
                         }
                         disabled
-                        className="w-full h-12 border border-slate-200 rounded-xl pl-10 pr-4 text-sm bg-slate-50 text-slate-500"
+                        className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm bg-slate-50 text-slate-500"
                       />
                     </div>
                   </div>
 
                   {/* ROLE */}
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  <div className="md:max-w-[48%]">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Role
                     </label>
 
@@ -1138,31 +1086,11 @@ function Profile() {
                         type="text"
                         value={profile.role}
                         disabled
-                        className="w-full h-12 border border-slate-200 rounded-xl pl-10 pr-4 text-sm bg-slate-50 text-slate-500"
+                        className="w-full h-11 border border-slate-200 rounded-xl pl-10 pr-4 text-sm bg-slate-50 text-slate-500"
                       />
                     </div>
                   </div>
 
-                  {/* ACCOUNT STATUS */}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
-                      Account Status
-                    </label>
-
-                    <div className="h-12 px-4 border border-slate-200 rounded-xl bg-slate-50 flex items-center">
-                      <span
-                        className={`inline-flex items-center gap-2 text-sm font-semibold ${
-                          profile.status === "Active"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        <CircleDot size={15} />
-                        {profile.status || "Active"}
-                      </span>
-                    </div>
-                  </div>
 
                 </div>
 
@@ -1176,7 +1104,7 @@ function Profile() {
 
                 {/* SAVE */}
 
-                <div className="flex justify-end mt-6">
+                <div className="flex justify-end mt-5">
                   <button
                     type="submit"
                     disabled={saving}
@@ -1236,7 +1164,7 @@ function Profile() {
                   {/* CURRENT PASSWORD */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Current Password
                     </label>
 
@@ -1261,7 +1189,7 @@ function Profile() {
                         }
                         placeholder="Enter current password"
                         autoComplete="current-password"
-                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                        className="w-full h-11 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                       />
 
                       <button
@@ -1285,7 +1213,7 @@ function Profile() {
                   {/* NEW PASSWORD */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       New Password
                     </label>
 
@@ -1310,7 +1238,7 @@ function Profile() {
                         }
                         placeholder="Enter new password"
                         autoComplete="new-password"
-                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                        className="w-full h-11 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                       />
 
                       <button
@@ -1338,7 +1266,7 @@ function Profile() {
                   {/* CONFIRM PASSWORD */}
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Confirm New Password
                     </label>
 
@@ -1363,7 +1291,7 @@ function Profile() {
                         }
                         placeholder="Confirm new password"
                         autoComplete="new-password"
-                        className="w-full h-12 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                        className="w-full h-11 border border-slate-300 rounded-xl pl-10 pr-12 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                       />
 
                       <button

@@ -2,6 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { installAuthInterceptor } from "./utils/auth";
+
+// Redirect to login whenever the API says the session expired
+installAuthInterceptor();
 
 // Load saved theme before the application starts
 const savedSettings = localStorage.getItem("settings");

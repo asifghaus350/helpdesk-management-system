@@ -6,12 +6,70 @@ import TicketComments from "../components/ticket/TicketComments";
 
 import TicketActivity from "../components/ticket/TicketActivity";
 
+import {
+  getStoredUser,
+  canEditTicket,
+  canAssignToSelf,
+} from "../utils/auth";
+
 function TicketDetails() {
   const { id } = useParams();
 
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState("");
+
+  const currentUser = getStoredUser();
+
+  // =========================
+  // ASSIGN TO ME (ENGINEER)
+  // =========================
+
+  const handleAssignToMe = async () => {
+    try {
+      setAssigning(true);
+      setAssignError("");
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `http://localhost:5000/api/tickets/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ assignToMe: true }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to assign ticket"
+        );
+      }
+
+      // Keep populated fields (createdBy) from the first load
+      setTicket((prev) => ({
+        ...prev,
+        engineer: data.ticket.engineer,
+        engineerId: data.ticket.engineerId,
+        status: data.ticket.status,
+        updatedAt: data.ticket.updatedAt,
+      }));
+    } catch (error) {
+      setAssignError(
+        error.message || "Unable to assign ticket."
+      );
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   // =========================
   // FETCH TICKET
@@ -132,14 +190,35 @@ function TicketDetails() {
 
         </div>
 
-        <Link
-          to={`/tickets/edit/${ticket.ticketId}`}
-          className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700"
-        >
-          Edit Ticket
-        </Link>
+        <div className="flex items-center gap-3">
+          {canAssignToSelf(ticket, currentUser) && (
+            <button
+              type="button"
+              onClick={handleAssignToMe}
+              disabled={assigning}
+              className="bg-emerald-600 text-white px-5 py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {assigning ? "Assigning..." : "Assign to me"}
+            </button>
+          )}
+
+          {canEditTicket(ticket, currentUser) && (
+            <Link
+              to={`/tickets/edit/${ticket.ticketId}`}
+              className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700"
+            >
+              Edit Ticket
+            </Link>
+          )}
+        </div>
 
       </div>
+
+      {assignError && (
+        <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+          {assignError}
+        </div>
+      )}
 
       {/* =========================
           TICKET CARD
@@ -296,12 +375,14 @@ function TicketDetails() {
             Back
           </Link>
 
-          <Link
-            to={`/tickets/edit/${ticket.ticketId}`}
-            className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700"
-          >
-            Edit Ticket
-          </Link>
+          {canEditTicket(ticket, currentUser) && (
+            <Link
+              to={`/tickets/edit/${ticket.ticketId}`}
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700"
+            >
+              Edit Ticket
+            </Link>
+          )}
 
         </div>
 

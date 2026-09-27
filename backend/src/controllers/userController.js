@@ -1,5 +1,17 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const Ticket = require("../models/Ticket");
+
+// Tickets store the engineer's display name next to
+// engineerId, so keep it in sync when a name changes.
+const syncEngineerName = async (user) => {
+  if (user.role === "Engineer") {
+    await Ticket.updateMany(
+      { engineerId: user._id },
+      { engineer: user.name }
+    );
+  }
+};
 
 // =========================
 // GET ALL USERS
@@ -7,8 +19,21 @@ const User = require("../models/User");
 
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find()
-      .select("-password")
+    // Optional filters, e.g. ?role=Engineer&status=Active
+    const filter = {};
+
+    if (typeof req.query.role === "string") {
+      filter.role = req.query.role;
+    }
+
+    if (typeof req.query.status === "string") {
+      filter.status = req.query.status;
+    }
+
+    const users = await User.find(filter)
+      .select(
+        "-password -resetPasswordToken -resetPasswordExpires"
+      )
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -246,6 +271,8 @@ const updateUser = async (req, res) => {
 
     await user.save();
 
+    await syncEngineerName(user);
+
     // =========================
     // RESPONSE
     // =========================
@@ -406,6 +433,8 @@ const updateOwnProfile = async (req, res) => {
     // =========================
 
     await user.save();
+
+    await syncEngineerName(user);
 
     // =========================
     // RESPONSE

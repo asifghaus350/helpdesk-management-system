@@ -12,14 +12,9 @@ const commentRoutes = require("./routes/commentRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 
 const connectDB = require("./config/db");
+const backfillEngineerIds = require("./utils/backfillEngineerIds");
 
 const app = express();
-
-// =========================
-// CONNECT MONGODB
-// =========================
-
-connectDB();
 
 // =========================
 // MIDDLEWARE
@@ -75,8 +70,16 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(
-    `Server running on http://localhost:${PORT}`
-  );
-});
+// Connect MongoDB first, then accept requests
+const startServer = async () => {
+  await connectDB();
+  await backfillEngineerIds();
+
+  app.listen(PORT, () => {
+    console.log(
+      `Server running on http://localhost:${PORT}`
+    );
+  });
+};
+
+startServer();

@@ -1,4 +1,9 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { signOut } from "firebase/auth";
+
+import { auth } from "../../firebase";
+import { clearSession, getStoredUser } from "../../utils/auth";
 
 import {
   LayoutDashboard,
@@ -12,7 +17,21 @@ import {
 function Sidebar() {
   const navigate = useNavigate();
 
-  const menuItems = [
+  const [user, setUser] = useState(getStoredUser);
+
+  useEffect(() => {
+    const handleUserChange = () => setUser(getStoredUser());
+
+    window.addEventListener("userChanged", handleUserChange);
+
+    return () =>
+      window.removeEventListener(
+        "userChanged",
+        handleUserChange
+      );
+  }, []);
+
+  const allMenuItems = [
     {
       name: "Dashboard",
       path: "/dashboard",
@@ -27,6 +46,7 @@ function Sidebar() {
       name: "Users",
       path: "/users",
       icon: Users,
+      roles: ["Admin"],
     },
     {
       name: "Reports",
@@ -40,10 +60,23 @@ function Sidebar() {
     },
   ];
 
+  // Hide items the current role cannot open
+  const menuItems = allMenuItems.filter(
+    (item) =>
+      !item.roles || item.roles.includes(user?.role)
+  );
+
   // Logout
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    clearSession();
+
+    // End the Google session too, so the next Google
+    // login asks which account to use.
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Firebase sign out error:", error);
+    }
 
     navigate("/login", { replace: true });
   };

@@ -86,7 +86,20 @@ function TicketList() {
   // =========================
   // SYNC FILTERS WITH URL
   // =========================
+  // When the URL changes from outside this page (navbar
+  // search, dashboard cards) while it is already open,
+  // copy the new values into the filter inputs.
 
+  const urlKey = searchParams.toString();
+  const [syncedUrlKey, setSyncedUrlKey] = useState(urlKey);
+
+  if (urlKey !== syncedUrlKey) {
+    setSyncedUrlKey(urlKey);
+    setSearch(searchParams.get("search") || "");
+    setStatus(searchParams.get("status") || "");
+    setPriority(searchParams.get("priority") || "");
+    setCategory(searchParams.get("category") || "");
+  }
 
   // =========================
   // UPDATE URL FILTER

@@ -1,20 +1,27 @@
 import { useState } from "react";
-import { Mail, Lock } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   GoogleAuthProvider,
   signInWithPopup,
 } from "firebase/auth";
 import { auth } from "../firebase";
+import { clearSession, updateStoredUser } from "../utils/auth";
 
 function Login() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 const [loading, setLoading] = useState(false);
 const [googleLoading, setGoogleLoading] = useState(false);
-const [error, setError] = useState("");
+const [searchParams] = useSearchParams();
+const [error, setError] = useState(
+  searchParams.get("expired")
+    ? "Your session has expired. Please log in again."
+    : ""
+);
 
   // Existing Email/Password Login
   const handleLogin = async (e) => {
@@ -53,17 +60,14 @@ const [error, setError] = useState("");
         );
       }
 
+      // Start from a clean session
+      clearSession();
+
       // Save JWT token
       localStorage.setItem("token", data.token);
 
-      // Save logged-in user
-      localStorage.setItem(
-        "user",
-        JSON.stringify(data.user)
-      );
-
-      // Notify other components about user change
-      window.dispatchEvent(new Event("userChanged"));
+      // Save logged-in user (also notifies navbar/sidebar)
+      updateStoredUser(data.user);
 
       // Redirect to dashboard
       navigate("/dashboard");
@@ -118,22 +122,17 @@ setGoogleLoading(true);
       );
     }
 
+    // Start from a clean session
+    clearSession();
+
     // Save HelpDesk JWT token
     localStorage.setItem(
       "token",
       data.token
     );
 
-    // Save logged-in HelpDesk user
-    localStorage.setItem(
-      "user",
-      JSON.stringify(data.user)
-    );
-
-    // Notify other components about user change
-    window.dispatchEvent(
-      new Event("userChanged")
-    );
+    // Save logged-in HelpDesk user (also notifies navbar/sidebar)
+    updateStoredUser(data.user);
 
     // Redirect to dashboard
     navigate("/dashboard");
@@ -262,15 +261,40 @@ setGoogleLoading(true);
                 />
 
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) =>
                     setPassword(e.target.value)
                   }
                   placeholder="Enter password"
                   autoComplete="current-password"
-                  className="w-full border rounded-xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-xl py-3 pl-12 pr-12 outline-none focus:ring-2 focus:ring-blue-500"
                 />
+
+                {/* Show / Hide Password */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowPassword((prev) => !prev)
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-blue-600"
+                  aria-label={
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
+                  }
+                  title={
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
+                  }
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} />
+                  ) : (
+                    <Eye size={20} />
+                  )}
+                </button>
 
               </div>
 

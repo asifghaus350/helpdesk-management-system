@@ -1,6 +1,8 @@
 const jwt = require("jsonwebtoken");
 
-const authMiddleware = (req, res, next) => {
+const User = require("../models/User");
+
+const authMiddleware = async (req, res, next) => {
   try {
     // Get Authorization header
     const authHeader = req.headers.authorization;
@@ -36,8 +38,26 @@ const authMiddleware = (req, res, next) => {
       process.env.JWT_SECRET
     );
 
-    // Store decoded user information
-    req.user = decoded;
+    // Load the account on every request so deleted,
+    // deactivated or re-roled users take effect at once
+    // instead of when their token expires.
+    const user = await User.findById(decoded.id).select(
+      "role status"
+    );
+
+    if (!user || user.status !== "Active") {
+      return res.status(401).json({
+        success: false,
+        message: "Account is no longer active",
+      });
+    }
+
+    // Store user information (role from DB, not the token)
+    req.user = {
+      ...decoded,
+      id: user._id.toString(),
+      role: user.role,
+    };
 
     next();
   } catch (error) {

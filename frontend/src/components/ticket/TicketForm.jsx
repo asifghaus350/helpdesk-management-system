@@ -81,7 +81,7 @@ function TicketForm({ mode = "create" }) {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/users",
+          "http://localhost:5000/api/users?role=Engineer&status=Active",
           {
             method: "GET",
             headers: {
@@ -170,7 +170,11 @@ function TicketForm({ mode = "create" }) {
           category: ticket.category || "",
           priority: ticket.priority || "",
           status: ticket.status || "Open",
-          engineer: ticket.engineer || "",
+          // Select holds the engineer's user id
+          engineer:
+            ticket.engineerId?._id ||
+            ticket.engineerId ||
+            "",
           description: ticket.description || "",
         });
       } catch (error) {
@@ -492,8 +496,11 @@ function TicketForm({ mode = "create" }) {
 
           {/* =========================
               STATUS
+              ADMIN, OR ENGINEER WHILE EDITING
           ========================= */}
 
+          {(isAdmin ||
+            (mode === "edit" && isEngineer)) && (
           <div>
             <label className="block font-medium mb-2">
               Status *
@@ -518,6 +525,7 @@ function TicketForm({ mode = "create" }) {
               </option>
             </select>
           </div>
+          )}
 
           {/* =========================
               ENGINEER
@@ -549,7 +557,7 @@ function TicketForm({ mode = "create" }) {
                       engineer._id ||
                       engineer.id
                     }
-                    value={engineer.name}
+                    value={engineer._id || engineer.id}
                   >
                     {engineer.name}
                   </option>

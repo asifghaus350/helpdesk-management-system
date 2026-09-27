@@ -6,6 +6,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
+  formatNotificationTime,
 } from "../../utils/notificationUtils";
 
 function NotificationDropdown() {
@@ -170,7 +171,7 @@ function NotificationDropdown() {
                       </p>
 
                       <p className="text-xs text-gray-400 mt-1">
-                        {notification.time}
+                        {formatNotificationTime(notification)}
                       </p>
 
                     </div>

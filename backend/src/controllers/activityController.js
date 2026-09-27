@@ -1,44 +1,6 @@
 const Activity = require("../models/Activity");
 const Ticket = require("../models/Ticket");
-const User = require("../models/User");
-
-// =========================
-// CHECK TICKET ACCESS
-// =========================
-
-const checkTicketAccess = async (ticket, user) => {
-  // ADMIN
-  if (user.role === "Admin") {
-    return true;
-  }
-
-  // USER
-  if (user.role === "User") {
-    return (
-      ticket.createdBy &&
-      ticket.createdBy.toString() === user.id.toString()
-    );
-  }
-
-  // ENGINEER
-  if (user.role === "Engineer") {
-    const currentUser = await User.findById(user.id).select(
-      "name role"
-    );
-
-    if (!currentUser) {
-      return false;
-    }
-
-    return (
-      ticket.engineer &&
-      ticket.engineer.trim().toLowerCase() ===
-        currentUser.name.trim().toLowerCase()
-    );
-  }
-
-  return false;
-};
+const { checkTicketAccess } = require("../utils/ticketAccess");
 
 // =========================
 // GET TICKET ACTIVITIES

@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { clearSession, isTokenExpired } from "../../utils/auth";
 
 function ProtectedRoute() {
   const token = localStorage.getItem("token");
@@ -10,6 +11,16 @@ function ProtectedRoute() {
 
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+
+  // =========================
+  // TOKEN EXPIRED
+  // =========================
+
+  if (isTokenExpired(token)) {
+    clearSession();
+
+    return <Navigate to="/login?expired=1" replace />;
   }
 
   // =========================
