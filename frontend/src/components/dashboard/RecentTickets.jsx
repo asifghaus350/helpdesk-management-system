@@ -1,4 +1,30 @@
 import { useNavigate } from "react-router-dom";
+import { Inbox } from "lucide-react";
+
+// =========================
+// RELATIVE TIME
+// =========================
+
+const timeAgo = (date) => {
+  if (!date) return "—";
+
+  const seconds = Math.floor(
+    (Date.now() - new Date(date).getTime()) / 1000
+  );
+
+  if (seconds < 60) return "Just now";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+
+  return new Date(date).toLocaleDateString();
+};
 
 function RecentTickets({ tickets = [] }) {
   const navigate = useNavigate();
@@ -14,16 +40,16 @@ function RecentTickets({ tickets = [] }) {
   const getStatusStyle = (status) => {
     switch (status) {
       case "Open":
-        return "bg-red-50 text-red-600";
+        return "bg-red-50 text-red-600 ring-red-100";
 
       case "In Progress":
-        return "bg-amber-50 text-amber-600";
+        return "bg-amber-50 text-amber-600 ring-amber-100";
 
       case "Closed":
-        return "bg-emerald-50 text-emerald-600";
+        return "bg-emerald-50 text-emerald-600 ring-emerald-100";
 
       default:
-        return "bg-slate-100 text-slate-600";
+        return "bg-slate-100 text-slate-600 ring-slate-200";
     }
   };
 
@@ -34,16 +60,16 @@ function RecentTickets({ tickets = [] }) {
   const getPriorityStyle = (priority) => {
     switch (priority) {
       case "High":
-        return "text-red-600";
+        return { text: "text-red-600", dot: "bg-red-500" };
 
       case "Medium":
-        return "text-amber-600";
+        return { text: "text-amber-600", dot: "bg-amber-500" };
 
       case "Low":
-        return "text-emerald-600";
+        return { text: "text-emerald-600", dot: "bg-emerald-500" };
 
       default:
-        return "text-slate-600";
+        return { text: "text-slate-600", dot: "bg-slate-400" };
     }
   };
 
@@ -53,7 +79,11 @@ function RecentTickets({ tickets = [] }) {
 
   if (recentTickets.length === 0) {
     return (
-      <div className="py-12 text-center">
+      <div className="py-12 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+          <Inbox size={22} />
+        </div>
+
         <p className="text-sm text-slate-500">
           No recent tickets found.
         </p>
@@ -76,77 +106,82 @@ function RecentTickets({ tickets = [] }) {
         {/* Table Header */}
 
         <thead>
-          <tr className="border-b border-slate-100">
-
-            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              ID
-            </th>
-
-            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Title
-            </th>
-
-            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Status
-            </th>
-
-            <th className="text-left py-3 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Priority
-            </th>
-
+          <tr className="border-b border-slate-100 bg-slate-50/60">
+            {["Ticket", "Status", "Priority", "Updated"].map(
+              (heading) => (
+                <th
+                  key={heading}
+                  className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                >
+                  {heading}
+                </th>
+              )
+            )}
           </tr>
         </thead>
 
         {/* Table Body */}
 
         <tbody>
-          {recentTickets.map((ticket) => (
-            <tr
-              key={ticket._id || ticket.ticketId}
-              onClick={() =>
-                navigate(`/tickets/${ticket.ticketId}`)
-              }
-              className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
+          {recentTickets.map((ticket) => {
+            const priority = getPriorityStyle(ticket.priority);
 
-              {/* ID */}
-
-              <td className="py-4 px-3 text-sm font-medium text-slate-700">
-                #{ticket.ticketId}
-              </td>
-
-              {/* Title */}
-
-              <td className="py-4 px-3">
-                <p className="text-sm font-medium text-slate-800">
-                  {ticket.title}
-                </p>
-              </td>
-
-              {/* Status */}
-
-              <td className="py-4 px-3">
-                <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(
-                    ticket.status
-                  )}`}
-                >
-                  {ticket.status}
-                </span>
-              </td>
-
-              {/* Priority */}
-
-              <td
-                className={`py-4 px-3 text-sm font-medium ${getPriorityStyle(
-                  ticket.priority
-                )}`}
+            return (
+              <tr
+                key={ticket._id || ticket.ticketId}
+                onClick={() =>
+                  navigate(`/tickets/${ticket.ticketId}`)
+                }
+                className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                {ticket.priority}
-              </td>
 
-            </tr>
-          ))}
+                {/* Ticket */}
+
+                <td className="py-4 px-6">
+                  <p className="text-sm font-semibold text-slate-800 truncate max-w-[260px]">
+                    {ticket.title}
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    #{ticket.ticketId}
+                    {ticket.category && ` · ${ticket.category}`}
+                  </p>
+                </td>
+
+                {/* Status */}
+
+                <td className="py-4 px-6">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ring-1 ring-inset whitespace-nowrap ${getStatusStyle(
+                      ticket.status
+                    )}`}
+                  >
+                    {ticket.status}
+                  </span>
+                </td>
+
+                {/* Priority */}
+
+                <td className="py-4 px-6">
+                  <span
+                    className={`inline-flex items-center gap-2 text-sm font-medium ${priority.text}`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${priority.dot}`}
+                    />
+                    {ticket.priority}
+                  </span>
+                </td>
+
+                {/* Updated */}
+
+                <td className="py-4 px-6 text-sm text-slate-500 whitespace-nowrap">
+                  {timeAgo(ticket.updatedAt || ticket.createdAt)}
+                </td>
+
+              </tr>
+            );
+          })}
         </tbody>
 
       </table>

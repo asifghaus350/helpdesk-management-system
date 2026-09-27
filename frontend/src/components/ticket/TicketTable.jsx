@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import DeleteModal from "../ui/DeleteModal";
+import {
+  getStoredUser,
+  canEditTicket,
+  canDeleteTicket,
+} from "../../utils/auth";
 
 function TicketTable({
   search,
@@ -16,9 +21,24 @@ function TicketTable({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const currentUser = getStoredUser();
 
-  const ticketsPerPage = 2;
+  // Page number is remembered per filter combination,
+  // so changing any filter goes back to page 1.
+  const filterKey = [search, status, priority, category].join("|");
+
+  const [pageState, setPageState] = useState({
+    key: filterKey,
+    page: 1,
+  });
+
+  const currentPage =
+    pageState.key === filterKey ? pageState.page : 1;
+
+  const setCurrentPage = (page) =>
+    setPageState({ key: filterKey, page });
+
+  const ticketsPerPage = 10;
 
   // =========================
   // FETCH TICKETS
@@ -216,11 +236,6 @@ function TicketTable({
     );
 
   // =========================
-  // RESET PAGE WHEN FILTER CHANGES
-  // =========================
-
-
-  // =========================
   // LOADING
   // =========================
 
@@ -242,7 +257,7 @@ function TicketTable({
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-md overflow-x-auto">
 
         {/* Table */}
 
@@ -390,31 +405,35 @@ function TicketTable({
                           <Eye size={18} />
                         </Link>
 
-                        {/* Edit */}
+                        {/* Edit: Admin, or assigned Engineer */}
 
-                        <Link
-                          to={`/tickets/edit/${ticket.ticketId}`}
-                          className="text-green-600 hover:text-green-800"
-                          title="Edit Ticket"
-                        >
-                          <Pencil size={18} />
-                        </Link>
+                        {canEditTicket(ticket, currentUser) && (
+                          <Link
+                            to={`/tickets/edit/${ticket.ticketId}`}
+                            className="text-green-600 hover:text-green-800"
+                            title="Edit Ticket"
+                          >
+                            <Pencil size={18} />
+                          </Link>
+                        )}
 
-                        {/* Delete */}
+                        {/* Delete: Admin only */}
 
-                        <button
-                          onClick={() => {
-                            setSelectedTicket(
-                              ticket.ticketId
-                            );
+                        {canDeleteTicket(currentUser) && (
+                          <button
+                            onClick={() => {
+                              setSelectedTicket(
+                                ticket.ticketId
+                              );
 
-                            setIsDeleteOpen(true);
-                          }}
-                          className="text-red-600 hover:text-red-800"
-                          title="Delete Ticket"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                              setIsDeleteOpen(true);
+                            }}
+                            className="text-red-600 hover:text-red-800"
+                            title="Delete Ticket"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
 
                       </div>
 

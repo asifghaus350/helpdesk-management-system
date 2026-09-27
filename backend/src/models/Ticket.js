@@ -41,10 +41,19 @@ const ticketSchema = new mongoose.Schema(
       default: "Open",
     },
 
+    // Display name of the assigned engineer
     engineer: {
       type: String,
       default: "",
       trim: true,
+    },
+
+    // Assigned engineer's user id (source of truth for access)
+    engineerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
     },
 
     createdBy: {
