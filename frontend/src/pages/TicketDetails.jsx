@@ -23,6 +23,7 @@ import {
   canAssignToSelf,
 } from "../utils/auth";
 import { timeAgo, initials } from "../utils/format";
+import { API_URL } from "../config";
 
 // =========================
 // STYLE MAPS
@@ -93,7 +94,7 @@ function TicketDetails() {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        `http://localhost:5000/api/tickets/${id}`,
+        `${API_URL}/api/tickets/${id}`,
         {
           method: "PUT",
           headers: {
@@ -151,7 +152,7 @@ function TicketDetails() {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/tickets/${id}`,
+          `${API_URL}/api/tickets/${id}`,
           {
             method: "GET",
             headers: {

@@ -1,6 +1,13 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Ticket = require("../models/Ticket");
+const {
+  parsePagination,
+  buildPagination,
+  searchRegex,
+  pickAllowed,
+  countsByKey,
+} = require("../utils/query");
 
 // Tickets store the engineer's display name next to
 // engineerId, so keep it in sync when a name changes.
@@ -17,34 +24,109 @@ const syncEngineerName = async (user) => {
 // GET ALL USERS
 // =========================
 
+const ROLES = ["Admin", "Engineer", "User"];
+const USER_STATUSES = ["Active", "Inactive"];
+
+const SAFE_USER_FIELDS =
+  "-password -resetPasswordToken -resetPasswordExpires";
+
+// Optional query: ?page=&limit=&search=&role=&status=
+// Without ?page the full list is returned (engineer dropdown).
 const getUsers = async (req, res) => {
   try {
-    // Optional filters, e.g. ?role=Engineer&status=Active
-    const filter = {};
+    const conditions = [];
 
-    if (typeof req.query.role === "string") {
-      filter.role = req.query.role;
+    const search = searchRegex(req.query.search);
+
+    if (search) {
+      conditions.push({
+        $or: [
+          { name: search },
+          { email: search },
+          { department: search },
+        ],
+      });
     }
 
-    if (typeof req.query.status === "string") {
-      filter.status = req.query.status;
+    const status = pickAllowed(req.query.status, USER_STATUSES);
+    if (status) conditions.push({ status });
+
+    // Everything except role, so role tabs can show counts
+    const withoutRole = conditions.length
+      ? { $and: conditions }
+      : {};
+
+    const role = pickAllowed(req.query.role, ROLES);
+
+    const filter = role
+      ? { $and: [...conditions, { role }] }
+      : withoutRole;
+
+    const pagination = parsePagination(req.query);
+
+    // Full list (backward compatible)
+    if (!pagination.paginate) {
+      const users = await User.find(filter)
+        .select(SAFE_USER_FIELDS)
+        .sort({ createdAt: -1 });
+
+      return res.status(200).json({
+        success: true,
+        count: users.length,
+        users,
+      });
     }
 
-    const users = await User.find(filter)
-      .select(
-        "-password -resetPasswordToken -resetPasswordExpires"
-      )
-      .sort({ createdAt: -1 });
+    const [users, total, roleRows, summaryRows] = await Promise.all([
+      User.find(filter)
+        .select(SAFE_USER_FIELDS)
+        .sort({ createdAt: -1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit),
 
-    res.status(200).json({
+      User.countDocuments(filter),
+
+      User.aggregate([
+        { $match: withoutRole },
+        { $group: { _id: "$role", count: { $sum: 1 } } },
+      ]),
+
+      // Whole-system numbers for the stat cards (ignore filters)
+      User.aggregate([
+        {
+          $group: {
+            _id: "$role",
+            count: { $sum: 1 },
+            active: {
+              $sum: { $cond: [{ $eq: ["$status", "Active"] }, 1, 0] },
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const roleCounts = countsByKey(roleRows, ROLES);
+    const summaryByRole = countsByKey(summaryRows, ROLES);
+
+    return res.status(200).json({
       success: true,
       count: users.length,
       users,
+      pagination: buildPagination(pagination, total),
+      roleCounts: {
+        all: Object.values(roleCounts).reduce((a, b) => a + b, 0),
+        ...roleCounts,
+      },
+      summary: {
+        total: Object.values(summaryByRole).reduce((a, b) => a + b, 0),
+        active: summaryRows.reduce((sum, row) => sum + row.active, 0),
+        byRole: summaryByRole,
+      },
     });
   } catch (error) {
     console.error("Get users error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server error while fetching users",
     });

@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useState,
 } from "react";
@@ -24,6 +23,8 @@ import {
   CircleAlert,
   LoaderCircle,
   Save,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
@@ -33,6 +34,9 @@ import Layout from "../components/layout/Layout";
 import { addNotification } from "../utils/notificationUtils";
 import { getStoredUser } from "../utils/auth";
 import { initials } from "../utils/format";
+import useDebouncedValue from "../utils/useDebouncedValue";
+import toast from "react-hot-toast";
+import { API_URL } from "../config";
 
 const ROLE_TABS = ["", "Admin", "Engineer", "User"];
 
@@ -102,118 +106,134 @@ function UserManagement() {
   });
 
   // =========================
-  // FETCH USERS
+  // SERVER LIST STATE
   // =========================
 
-  const fetchUsers = useCallback(async () => {
-    try {
-    
-      const token = localStorage.getItem("token");
+  const USERS_PER_PAGE = 10;
 
-      if (!token) {
-        navigate("/login");
-        return;
-      }
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [serverRoleCounts, setServerRoleCounts] = useState({});
+  const [summary, setSummary] = useState(null);
+  const [fetching, setFetching] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-      const response = await fetch(
-        "http://localhost:5000/api/users",
-        {
-          method: "GET",
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+  // Page is remembered per filter combination, so changing
+  // a filter goes back to page 1.
+  const filterKey = [search, roleFilter, statusFilter].join("|");
 
-      const data = await response.json();
+  const [pageState, setPageState] = useState({
+    key: filterKey,
+    page: 1,
+  });
 
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            "Failed to fetch users"
-        );
-      }
+  const currentPage =
+    pageState.key === filterKey ? pageState.page : 1;
 
-      setUsers(data.users || []);
-      setError("");
-    } catch (error) {
-      console.error(
-        "Fetch users error:",
-        error
-      );
+  const setCurrentPage = (page) =>
+    setPageState({ key: filterKey, page });
 
-      setError(
-        error.message ||
-          "Unable to load users."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [navigate]);
+  // Reload the current page (after create / update / delete)
+  const fetchUsers = () => setReloadKey((key) => key + 1);
 
   // =========================
-  // INITIAL LOAD
+  // FETCH ONE PAGE OF USERS
   // =========================
 
   useEffect(() => {
-  let cancelled = false;
+    let cancelled = false;
 
-  const loadUsers = async () => {
-    try {
-      const token = localStorage.getItem("token");
+    const loadUsers = async () => {
+      try {
+        setFetching(true);
 
-      if (!token) {
-        navigate("/login");
-        return;
-      }
+        const token = localStorage.getItem("token");
 
-      const response = await fetch(
-        "http://localhost:5000/api/users",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        if (!token) {
+          navigate("/login");
+          return;
         }
-      );
 
-      const data = await response.json();
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(USERS_PER_PAGE),
+        });
 
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to fetch users"
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (roleFilter) params.set("role", roleFilter);
+        if (statusFilter) params.set("status", statusFilter);
+
+        const response = await fetch(
+          `${API_URL}/api/users?${params}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
-      }
 
-      if (!cancelled) {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to fetch users"
+          );
+        }
+
+        if (cancelled) return;
+
+        // Page became empty (e.g. its last user was deleted):
+        // step back one page instead of showing an empty table.
+        if ((data.users || []).length === 0 && currentPage > 1) {
+          setPageState((prev) => ({
+            ...prev,
+            page: Math.max(1, prev.page - 1),
+          }));
+          return;
+        }
+
         setUsers(data.users || []);
+        setTotalCount(data.pagination?.total ?? 0);
+        setTotalPages(data.pagination?.totalPages ?? 1);
+        setServerRoleCounts(data.roleCounts || {});
+        setSummary(data.summary || null);
         setError("");
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error(
-        "Fetch users error:",
-        error
-      );
-
-      if (!cancelled) {
-        setError(
-          error.message ||
-            "Unable to load users."
+      } catch (error) {
+        console.error(
+          "Fetch users error:",
+          error
         );
 
-        setLoading(false);
+        if (!cancelled) {
+          setError(
+            error.message ||
+              "Unable to load users."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setFetching(false);
+        }
       }
-    }
-  };
+    };
 
-  loadUsers();
+    loadUsers();
 
-  return () => {
-    cancelled = true;
-  };
-}, [navigate]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    navigate,
+    currentPage,
+    debouncedSearch,
+    roleFilter,
+    statusFilter,
+    reloadKey,
+  ]);
 
   // =========================
   // HANDLE INPUT
@@ -365,7 +385,7 @@ function UserManagement() {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/users/${editingUser._id}`,
+          `${API_URL}/api/users/${editingUser._id}`,
           {
             method: "PUT",
 
@@ -399,9 +419,7 @@ function UserManagement() {
           "user"
         );
 
-        alert(
-          "User updated successfully!"
-        );
+        toast.success("User updated successfully!");
 
         closeModal();
 
@@ -435,7 +453,7 @@ function UserManagement() {
       // =========================
 
       const response = await fetch(
-        "http://localhost:5000/api/users",
+        `${API_URL}/api/users`,
         {
           method: "POST",
 
@@ -478,9 +496,7 @@ function UserManagement() {
         "user"
       );
 
-      alert(
-        "User created successfully!"
-      );
+      toast.success("User created successfully!");
 
       closeModal();
 
@@ -516,7 +532,7 @@ function UserManagement() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/users/${user._id}`,
+        `${API_URL}/api/users/${user._id}`,
         {
           method: "DELETE",
 
@@ -541,9 +557,7 @@ function UserManagement() {
         "user"
       );
 
-      alert(
-        "User deleted successfully!"
-      );
+      toast.success("User deleted successfully!");
 
       await fetchUsers();
     } catch (error) {
@@ -560,68 +574,61 @@ function UserManagement() {
   };
 
   // =========================
-  // FILTERED USERS + COUNTS
+  // COUNTS (from the server)
   // =========================
 
-  const searchText = search.trim().toLowerCase();
+  const searchText = search.trim();
 
-  // Everything except role, so the role tabs can show counts
-  const matchingUsers = users.filter((user) => {
-    const matchesSearch =
-      !searchText ||
-      user.name?.toLowerCase().includes(searchText) ||
-      user.email?.toLowerCase().includes(searchText) ||
-      user.department?.toLowerCase().includes(searchText);
+  const roleCounts = {
+    "": serverRoleCounts.all ?? 0,
+    Admin: serverRoleCounts.Admin ?? 0,
+    Engineer: serverRoleCounts.Engineer ?? 0,
+    User: serverRoleCounts.User ?? 0,
+  };
 
-    const matchesStatus =
-      !statusFilter || user.status === statusFilter;
+  // Current page of users
+  const visibleUsers = users;
 
-    return matchesSearch && matchesStatus;
-  });
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const firstIndex = (safeCurrentPage - 1) * USERS_PER_PAGE;
 
-  const roleCounts = ROLE_TABS.reduce(
-    (counts, role) => ({
-      ...counts,
-      [role]: role
-        ? matchingUsers.filter((user) => user.role === role).length
-        : matchingUsers.length,
-    }),
-    {}
+  const firstPageButton = Math.max(
+    1,
+    Math.min(safeCurrentPage - 2, totalPages - 4)
   );
 
-  const visibleUsers = roleFilter
-    ? matchingUsers.filter((user) => user.role === roleFilter)
-    : matchingUsers;
+  const pageButtons = Array.from(
+    { length: Math.min(5, totalPages) },
+    (_, index) => firstPageButton + index
+  );
 
-  const activeCount = users.filter(
-    (user) => user.status === "Active"
-  ).length;
+  const byRole = summary?.byRole || {};
 
   const statCards = [
     {
       label: "Total Users",
-      value: users.length,
-      hint: `${activeCount} active`,
+      value: summary?.total ?? 0,
+      hint: `${summary?.active ?? 0} active`,
       icon: Users,
       tile: "bg-blue-50 text-blue-600",
     },
     {
       label: "Admins",
-      value: users.filter((user) => user.role === "Admin").length,
+      value: byRole.Admin ?? 0,
       hint: "Full access",
       icon: ShieldCheck,
       tile: "bg-violet-50 text-violet-600",
     },
     {
       label: "Engineers",
-      value: users.filter((user) => user.role === "Engineer").length,
+      value: byRole.Engineer ?? 0,
       hint: "Resolve tickets",
       icon: Wrench,
       tile: "bg-amber-50 text-amber-600",
     },
     {
       label: "Users",
-      value: users.filter((user) => user.role === "User").length,
+      value: byRole.User ?? 0,
       hint: "Raise tickets",
       icon: User,
       tile: "bg-emerald-50 text-emerald-600",
@@ -870,7 +877,12 @@ function UserManagement() {
           USERS TABLE
       ========================= */}
 
-      <div className="bg-white border border-t-0 border-slate-200 rounded-b-2xl shadow-sm overflow-hidden">
+      <div
+        aria-busy={fetching}
+        className={`bg-white border border-t-0 border-slate-200 rounded-b-2xl shadow-sm overflow-hidden transition-opacity ${
+          fetching ? "opacity-60" : ""
+        }`}
+      >
 
         {visibleUsers.length === 0 ? (
 
@@ -1073,16 +1085,57 @@ function UserManagement() {
         )}
 
         {visibleUsers.length > 0 && (
-          <div className="px-5 py-3.5 border-t border-slate-100 text-sm text-slate-500">
-            Showing{" "}
-            <span className="font-semibold text-slate-700">
-              {visibleUsers.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-semibold text-slate-700">
-              {users.length}
-            </span>{" "}
-            users
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-100">
+            <p className="text-sm text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-700">
+                {firstIndex + 1}–{firstIndex + visibleUsers.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-700">
+                {totalCount}
+              </span>{" "}
+              users
+            </p>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(safeCurrentPage - 1)}
+                  disabled={safeCurrentPage === 1}
+                  aria-label="Previous page"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={17} />
+                </button>
+
+                {pageButtons.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-9 h-9 rounded-lg text-sm font-medium transition ${
+                      page === safeCurrentPage
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(safeCurrentPage + 1)}
+                  disabled={safeCurrentPage === totalPages}
+                  aria-label="Next page"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={17} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,5 +1,8 @@
+const mongoose = require("mongoose");
+
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
+const Comment = require("../models/Comment");
 const User = require("../models/User");
 const Counter = require("../models/Counter");
 
@@ -10,6 +13,13 @@ const {
   engineerTicketFilter,
   resolveEngineer,
 } = require("../utils/ticketAccess");
+const {
+  parsePagination,
+  buildPagination,
+  searchRegex,
+  pickAllowed,
+  countsByKey,
+} = require("../utils/query");
 
 // =========================
 // NEXT TICKET ID
@@ -153,57 +163,127 @@ const createTicket = async (req, res) => {
 };
 
 // =========================
+// VISIBLE TICKETS (by role)
+// =========================
+// Admin: all · Engineer: assigned + unassigned queue ·
+// User: own tickets. Returns null if the account is gone.
+
+const STATUSES = ["Open", "In Progress", "Closed"];
+const PRIORITIES = ["High", "Medium", "Low"];
+const CATEGORIES = ["Bug", "Support", "Feature Request"];
+
+const visibilityFilter = async (user) => {
+  if (user.role === "Admin") {
+    return {};
+  }
+
+  if (user.role === "Engineer") {
+    const engineer = await User.findById(user.id).select("name");
+
+    return engineer ? engineerTicketFilter(engineer) : null;
+  }
+
+  // ObjectId (not string) so the filter also works in aggregate()
+  return {
+    createdBy: new mongoose.Types.ObjectId(user.id),
+  };
+};
+
+// =========================
 // GET ALL TICKETS
 // =========================
+// Optional query: ?page=&limit=&search=&status=&priority=
+//                 &category=&assigned=unassigned
+// Without ?page the full list is returned (used by Reports).
 
 const getTickets = async (req, res) => {
   try {
-    let filter = {};
+    const baseFilter = await visibilityFilter(req.user);
 
-    // =========================
-    // ADMIN
-    // =========================
-
-    if (req.user.role === "Admin") {
-      // Admin can see all tickets
-      filter = {};
+    if (!baseFilter) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found",
+      });
     }
 
-    // =========================
-    // ENGINEER
-    // =========================
+    // Filters other than status (status tabs need counts
+    // across all statuses for the same search).
+    const conditions = [baseFilter];
 
-    if (req.user.role === "Engineer") {
-      const engineer = await User.findById(req.user.id).select("name");
+    const search = searchRegex(req.query.search);
 
-      if (!engineer) {
-        return res.status(404).json({
-          success: false,
-          message: "Engineer account not found",
-        });
-      }
-
-      // Assigned tickets + unassigned queue
-      filter = engineerTicketFilter(engineer);
+    if (search) {
+      conditions.push({
+        $or: [
+          { ticketId: search },
+          { title: search },
+          { description: search },
+          { engineer: search },
+        ],
+      });
     }
 
-    // =========================
-    // USER
-    // =========================
+    const priority = pickAllowed(req.query.priority, PRIORITIES);
+    if (priority) conditions.push({ priority });
 
-    if (req.user.role === "User") {
-      // User can see only tickets created by themselves.
-      filter.createdBy = req.user.id;
+    const category = pickAllowed(req.query.category, CATEGORIES);
+    if (category) conditions.push({ category });
+
+    if (req.query.assigned === "unassigned") {
+      conditions.push({ engineerId: null, engineer: "" });
     }
 
-    const tickets = await Ticket.find(filter)
-      .populate("createdBy", "name email role")
-      .sort({ createdAt: -1 });
+    const withoutStatus =
+      conditions.length > 1 ? { $and: conditions } : baseFilter;
+
+    const status = pickAllowed(req.query.status, STATUSES);
+
+    const filter = status
+      ? { $and: [...conditions, { status }] }
+      : withoutStatus;
+
+    const pagination = parsePagination(req.query);
+
+    // Full list (backward compatible)
+    if (!pagination.paginate) {
+      const tickets = await Ticket.find(filter)
+        .populate("createdBy", "name email role")
+        .sort({ createdAt: -1 });
+
+      return res.status(200).json({
+        success: true,
+        count: tickets.length,
+        tickets,
+      });
+    }
+
+    const [tickets, total, statusRows] = await Promise.all([
+      Ticket.find(filter)
+        .populate("createdBy", "name email role")
+        .sort({ createdAt: -1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit),
+
+      Ticket.countDocuments(filter),
+
+      Ticket.aggregate([
+        { $match: withoutStatus },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const statusCounts = countsByKey(statusRows, STATUSES);
 
     return res.status(200).json({
       success: true,
       count: tickets.length,
       tickets,
+      pagination: buildPagination(pagination, total),
+      statusCounts: {
+        all: Object.values(statusCounts).reduce((a, b) => a + b, 0),
+        ...statusCounts,
+      },
     });
   } catch (error) {
     console.error("Get tickets error:", error.message);
@@ -211,6 +291,79 @@ const getTickets = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error while fetching tickets",
+    });
+  }
+};
+
+// =========================
+// TICKET STATS
+// =========================
+// Counts for dashboard / profile without downloading every
+// ticket. Same role visibility as the list.
+
+const getTicketStats = async (req, res) => {
+  try {
+    const baseFilter = await visibilityFilter(req.user);
+
+    if (!baseFilter) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found",
+      });
+    }
+
+    // ?recent=N latest tickets (default 5, 0 = none)
+    const requestedRecent = parseInt(req.query.recent, 10);
+
+    const recentLimit = Number.isNaN(requestedRecent)
+      ? 5
+      : Math.min(20, Math.max(0, requestedRecent));
+
+    const [statusRows, activePriorityRows, unassigned, recentTickets] =
+      await Promise.all([
+        Ticket.aggregate([
+          { $match: baseFilter },
+          { $group: { _id: "$status", count: { $sum: 1 } } },
+        ]),
+
+        Ticket.aggregate([
+          { $match: { ...baseFilter, status: { $ne: "Closed" } } },
+          { $group: { _id: "$priority", count: { $sum: 1 } } },
+        ]),
+
+        Ticket.countDocuments({
+          ...baseFilter,
+          status: { $ne: "Closed" },
+          engineerId: null,
+          engineer: "",
+        }),
+
+        recentLimit > 0
+          ? Ticket.find(baseFilter)
+              .populate("createdBy", "name email role")
+              .sort({ createdAt: -1 })
+              .limit(recentLimit)
+          : [],
+      ]);
+
+    const byStatus = countsByKey(statusRows, STATUSES);
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        total: Object.values(byStatus).reduce((a, b) => a + b, 0),
+        byStatus,
+        activeByPriority: countsByKey(activePriorityRows, PRIORITIES),
+        unassigned,
+      },
+      recentTickets,
+    });
+  } catch (error) {
+    console.error("Get ticket stats error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching ticket stats",
     });
   }
 };
@@ -625,8 +778,9 @@ const deleteTicket = async (req, res) => {
       newValue: "Deleted",
     });
 
-    // Delete the ticket itself
+    // Delete the ticket and its comments
     await Ticket.findByIdAndDelete(ticket._id);
+    await Comment.deleteMany({ ticket: ticket._id });
 
     // IMPORTANT:
     // Do NOT delete the ticket's activities.
@@ -658,6 +812,7 @@ const deleteTicket = async (req, res) => {
 module.exports = {
   createTicket,
   getTickets,
+  getTicketStats,
   getTicketById,
   updateTicket,
   deleteTicket,

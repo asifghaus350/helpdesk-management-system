@@ -73,7 +73,7 @@ function Sidebar() {
     // End the Google session too, so the next Google
     // login asks which account to use.
     try {
-      await signOut(auth);
+      if (auth) await signOut(auth);
     } catch (error) {
       console.error("Firebase sign out error:", error);
     }

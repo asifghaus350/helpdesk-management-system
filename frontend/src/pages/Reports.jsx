@@ -27,6 +27,7 @@ import {
 
 import Layout from "../components/layout/Layout";
 import { initials } from "../utils/format";
+import { API_URL } from "../config";
 
 // =========================
 // CHART COLORS
@@ -202,7 +203,7 @@ function Reports() {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/tickets",
+          `${API_URL}/api/tickets`,
           {
             method: "GET",
             headers: {

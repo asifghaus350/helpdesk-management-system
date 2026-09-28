@@ -3,6 +3,7 @@ const express = require("express");
 const {
   createTicket,
   getTickets,
+  getTicketStats,
   getTicketById,
   updateTicket,
   deleteTicket,
@@ -31,6 +32,17 @@ router.get(
   "/",
   authMiddleware,
   getTickets
+);
+
+// =========================
+// TICKET STATS
+// (before "/:id" so "stats" isn't read as a ticket id)
+// =========================
+
+router.get(
+  "/stats",
+  authMiddleware,
+  getTicketStats
 );
 
 // =========================

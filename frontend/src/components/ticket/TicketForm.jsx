@@ -14,6 +14,8 @@ import {
 
 import { addNotification } from "../../utils/notificationUtils";
 import { initials } from "../../utils/format";
+import toast from "react-hot-toast";
+import { API_URL } from "../../config";
 
 function TicketForm({ mode = "create" }) {
   const navigate = useNavigate();
@@ -99,7 +101,7 @@ function TicketForm({ mode = "create" }) {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/users?role=Engineer&status=Active",
+          `${API_URL}/api/users?role=Engineer&status=Active`,
           {
             method: "GET",
             headers: {
@@ -163,7 +165,7 @@ function TicketForm({ mode = "create" }) {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/tickets/${id}`,
+          `${API_URL}/api/tickets/${id}`,
           {
             method: "GET",
             headers: {
@@ -292,7 +294,7 @@ function TicketForm({ mode = "create" }) {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/tickets",
+          `${API_URL}/api/tickets`,
           {
             method: "POST",
 
@@ -320,9 +322,7 @@ function TicketForm({ mode = "create" }) {
           "ticket"
         );
 
-        alert(
-          "Ticket created successfully!"
-        );
+        toast.success("Ticket created successfully!");
 
         navigate("/tickets");
 
@@ -348,7 +348,7 @@ function TicketForm({ mode = "create" }) {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/tickets/${id}`,
+          `${API_URL}/api/tickets/${id}`,
           {
             method: "PUT",
 
@@ -376,9 +376,7 @@ function TicketForm({ mode = "create" }) {
           "ticket"
         );
 
-        alert(
-          "Ticket updated successfully!"
-        );
+        toast.success("Ticket updated successfully!");
 
         navigate("/tickets");
       }

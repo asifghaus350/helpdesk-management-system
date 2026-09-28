@@ -18,6 +18,8 @@ import {
   canDeleteTicket,
 } from "../../utils/auth";
 import { timeAgo, initials } from "../../utils/format";
+import useDebouncedValue from "../../utils/useDebouncedValue";
+import { API_URL } from "../../config";
 
 // =========================
 // STYLE MAPS
@@ -78,11 +80,21 @@ function TicketTable({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
+  // Current page of tickets from the server
   const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [serverStatusCounts, setServerStatusCounts] = useState({});
+
+  const [loading, setLoading] = useState(true);   // first load
+  const [fetching, setFetching] = useState(false); // later reloads
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   const currentUser = getStoredUser();
+
+  // Wait until typing stops before searching on the server
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
   // Page number is remembered per filter combination,
   // so changing any filter goes back to page 1.
@@ -102,13 +114,15 @@ function TicketTable({
   const ticketsPerPage = 10;
 
   // =========================
-  // FETCH TICKETS
+  // FETCH ONE PAGE OF TICKETS
   // =========================
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchTickets = async () => {
       try {
-        setLoading(true);
+        setFetching(true);
         setError("");
 
         const token = localStorage.getItem("token");
@@ -118,8 +132,18 @@ function TicketTable({
           return;
         }
 
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(ticketsPerPage),
+        });
+
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (status) params.set("status", status);
+        if (priority) params.set("priority", priority);
+        if (category) params.set("category", category);
+
         const response = await fetch(
-          "http://localhost:5000/api/tickets",
+          `${API_URL}/api/tickets?${params}`,
           {
             method: "GET",
             headers: {
@@ -136,21 +160,42 @@ function TicketTable({
           );
         }
 
+        if (cancelled) return;
+
         setTickets(data.tickets || []);
+        setTotalCount(data.pagination?.total ?? 0);
+        setTotalPages(data.pagination?.totalPages ?? 1);
+        setServerStatusCounts(data.statusCounts || {});
       } catch (error) {
         console.error("Fetch tickets error:", error);
 
-        setError(
-          error.message ||
-            "Unable to load tickets."
-        );
+        if (!cancelled) {
+          setError(
+            error.message ||
+              "Unable to load tickets."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setFetching(false);
+        }
       }
     };
 
     fetchTickets();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentPage,
+    debouncedSearch,
+    status,
+    priority,
+    category,
+    reloadKey,
+  ]);
 
   // =========================
   // DELETE TICKET
@@ -168,7 +213,7 @@ function TicketTable({
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/tickets/${selectedTicket}`,
+        `${API_URL}/api/tickets/${selectedTicket}`,
         {
           method: "DELETE",
           headers: {
@@ -185,17 +230,16 @@ function TicketTable({
         );
       }
 
-      // Remove deleted ticket from UI.
-      // The current page is clamped below, so no reset needed.
-      setTickets((prev) =>
-        prev.filter(
-          (ticket) =>
-            ticket.ticketId !== selectedTicket
-        )
-      );
-
       setIsDeleteOpen(false);
       setSelectedTicket(null);
+
+      // Deleted the last row of a page: go back one page.
+      // Otherwise reload the same page from the server.
+      if (tickets.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        setReloadKey((key) => key + 1);
+      }
     } catch (error) {
       console.error("Delete ticket error:", error);
 
@@ -207,86 +251,26 @@ function TicketTable({
   };
 
   // =========================
-  // SEARCH + FILTER
+  // COUNTS + PAGINATION
   // =========================
 
-  const searchText = search.toLowerCase();
-
-  // Everything except status, so the status tabs can show counts
-  const matchingTickets = tickets.filter((ticket) => {
-    const matchesSearch =
-      ticket.ticketId
-        ?.toLowerCase()
-        .includes(searchText) ||
-      ticket.title
-        ?.toLowerCase()
-        .includes(searchText) ||
-      ticket.description
-        ?.toLowerCase()
-        .includes(searchText) ||
-      ticket.engineer
-        ?.toLowerCase()
-        .includes(searchText);
-
-    const matchesPriority =
-      priority === "" ||
-      ticket.priority === priority;
-
-    const matchesCategory =
-      category === "" ||
-      ticket.category === category;
-
-    return (
-      matchesSearch &&
-      matchesPriority &&
-      matchesCategory
-    );
-  });
-
-  const statusCounts = STATUS_TABS.reduce(
-    (counts, tab) => ({
-      ...counts,
-      [tab]: tab
-        ? matchingTickets.filter(
-            (ticket) => ticket.status === tab
-          ).length
-        : matchingTickets.length,
-    }),
-    {}
-  );
-
-  const filteredTickets = status
-    ? matchingTickets.filter(
-        (ticket) => ticket.status === status
-      )
-    : matchingTickets;
+  const statusCounts = {
+    "": serverStatusCounts.all ?? 0,
+    Open: serverStatusCounts.Open ?? 0,
+    "In Progress": serverStatusCounts["In Progress"] ?? 0,
+    Closed: serverStatusCounts.Closed ?? 0,
+  };
 
   const hasFilters = Boolean(
     search || status || priority || category
   );
 
-  // =========================
-  // PAGINATION
-  // =========================
+  const currentTickets = tickets;
 
-  const totalPages = Math.ceil(
-    filteredTickets.length /
-      ticketsPerPage
-  );
-
-  const safeCurrentPage =
-    totalPages > 0
-      ? Math.min(currentPage, totalPages)
-      : 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const indexOfFirstTicket =
     (safeCurrentPage - 1) * ticketsPerPage;
-
-  const currentTickets =
-    filteredTickets.slice(
-      indexOfFirstTicket,
-      indexOfFirstTicket + ticketsPerPage
-    );
 
   // Up to 5 page buttons around the current page
   const firstPageButton = Math.max(
@@ -379,7 +363,12 @@ function TicketTable({
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div
+        aria-busy={fetching}
+        className={`bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition-opacity ${
+          fetching ? "opacity-60" : ""
+        }`}
+      >
 
         {currentTickets.length === 0 ? (
 
@@ -623,7 +612,7 @@ function TicketTable({
             PAGINATION
         ========================= */}
 
-        {filteredTickets.length > 0 && (
+        {totalCount > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-slate-100">
 
             <p className="text-sm text-slate-500">
@@ -634,7 +623,7 @@ function TicketTable({
               </span>{" "}
               of{" "}
               <span className="font-semibold text-slate-700">
-                {filteredTickets.length}
+                {totalCount}
               </span>{" "}
               tickets
             </p>
