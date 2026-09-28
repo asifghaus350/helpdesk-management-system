@@ -22,10 +22,13 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
+import { API_URL } from "../config";
 
 function Dashboard() {
   const navigate = useNavigate();
 
+  // Counts + latest tickets from /api/tickets/stats
+  const [stats, setStats] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,7 +99,7 @@ function Dashboard() {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/tickets",
+          `${API_URL}/api/tickets/stats?recent=5`,
           {
             method: "GET",
             headers: {
@@ -114,7 +117,8 @@ function Dashboard() {
           );
         }
 
-        setTickets(data.tickets || []);
+        setStats(data.stats || null);
+        setTickets(data.recentTickets || []);
       } catch (error) {
         console.error(
           "Dashboard tickets error:",
@@ -137,19 +141,14 @@ function Dashboard() {
   // TICKET COUNTS
   // =========================
 
-  const totalTickets = tickets.length;
+  const totalTickets = stats?.total ?? 0;
 
-  const openTickets = tickets.filter(
-    (ticket) => ticket.status === "Open"
-  ).length;
+  const openTickets = stats?.byStatus?.Open ?? 0;
 
-  const inProgressTickets = tickets.filter(
-    (ticket) => ticket.status === "In Progress"
-  ).length;
+  const inProgressTickets =
+    stats?.byStatus?.["In Progress"] ?? 0;
 
-  const closedTickets = tickets.filter(
-    (ticket) => ticket.status === "Closed"
-  ).length;
+  const closedTickets = stats?.byStatus?.Closed ?? 0;
 
   const percentOf = (value) =>
     totalTickets
@@ -162,11 +161,7 @@ function Dashboard() {
   const priorityCounts = ["High", "Medium", "Low"].map(
     (level) => ({
       level,
-      count: tickets.filter(
-        (ticket) =>
-          ticket.priority === level &&
-          ticket.status !== "Closed"
-      ).length,
+      count: stats?.activeByPriority?.[level] ?? 0,
     })
   );
 

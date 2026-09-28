@@ -12,8 +12,31 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Firebase is only used for "Continue with Google". Without its
+// keys in frontend/.env, getAuth() throws on load and the whole
+// app renders blank — so only initialise it when configured.
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.authDomain
+);
 
-export const auth = getAuth(app);
+let app = null;
+let auth = null;
+
+if (isFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+  } catch (error) {
+    console.error("Firebase init failed. Google login is disabled:", error);
+    app = null;
+    auth = null;
+  }
+} else {
+  console.warn(
+    "Firebase keys missing in frontend/.env — Google login is disabled."
+  );
+}
+
+export { auth };
 
 export default app;

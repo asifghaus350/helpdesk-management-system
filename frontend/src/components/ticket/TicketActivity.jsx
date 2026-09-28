@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { timeAgo } from "../../utils/format";
+import { API_URL } from "../../config";
 
 // Actions whose old/new values are worth showing as "A → B".
 // For the others (e.g. a comment's full text) the message says enough.
@@ -119,7 +120,7 @@ function TicketActivity({ ticketId, refreshKey = 0 }) {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/activities/ticket/${ticketId}`,
+          `${API_URL}/api/activities/ticket/${ticketId}`,
           {
             method: "GET",
             headers: {

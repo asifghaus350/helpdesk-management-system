@@ -11,6 +11,7 @@ import {
 
 import { getStoredUser } from "../../utils/auth";
 import { timeAgo, initials } from "../../utils/format";
+import { API_URL } from "../../config";
 
 const MAX_LENGTH = 2000;
 
@@ -63,7 +64,7 @@ function TicketComments({ ticketId, onChange }) {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/comments/ticket/${ticketId}`,
+          `${API_URL}/api/comments/ticket/${ticketId}`,
           {
             method: "GET",
             headers: {
@@ -134,7 +135,7 @@ function TicketComments({ ticketId, onChange }) {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/comments/ticket/${ticketId}`,
+        `${API_URL}/api/comments/ticket/${ticketId}`,
         {
           method: "POST",
           headers: {
@@ -164,7 +165,7 @@ function TicketComments({ ticketId, onChange }) {
         // Fallback: reload comments if API
         // doesn't return the created comment.
         const refreshResponse = await fetch(
-          `http://localhost:5000/api/comments/ticket/${ticketId}`,
+          `${API_URL}/api/comments/ticket/${ticketId}`,
           {
             method: "GET",
             headers: {
@@ -245,7 +246,7 @@ function TicketComments({ ticketId, onChange }) {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/comments/${id}`,
+        `${API_URL}/api/comments/${id}`,
         {
           method: "PUT",
           headers: {
@@ -314,7 +315,7 @@ function TicketComments({ ticketId, onChange }) {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/comments/${id}`,
+        `${API_URL}/api/comments/${id}`,
         {
           method: "DELETE",
           headers: {

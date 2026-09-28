@@ -67,4 +67,9 @@ const ticketSchema = new mongoose.Schema(
   }
 );
 
+// Indexes for the list, filters and stats
+ticketSchema.index({ createdAt: -1 });
+ticketSchema.index({ createdBy: 1, createdAt: -1 });
+ticketSchema.index({ status: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Ticket", ticketSchema);

@@ -1,43 +1,53 @@
-import { ShieldX } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { ShieldX, ArrowLeft, LayoutDashboard } from "lucide-react";
+
+import StatusPage from "../components/common/StatusPage";
+import { getStoredUser } from "../utils/auth";
 
 function AccessDenied() {
   const navigate = useNavigate();
+  const user = getStoredUser();
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
-      <div className="bg-white rounded-2xl shadow-xl p-10 max-w-md w-full text-center">
+    <StatusPage
+      code="403"
+      icon={ShieldX}
+      iconClass="bg-red-500 text-white"
+      title="Access denied"
+      message="You don't have permission to open this page. It's only available to administrators."
+      footer={
+        user && (
+          <>
+            Signed in as{" "}
+            <span className="font-medium text-slate-600">
+              {user.name}
+            </span>{" "}
+            <span className="inline-block px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-semibold">
+              {user.role}
+            </span>
+            <br />
+            Need access? Ask an administrator to update your role.
+          </>
+        )
+      }
+    >
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+      >
+        <ArrowLeft size={17} />
+        Go back
+      </button>
 
-        {/* Icon */}
-        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-50 flex items-center justify-center">
-          <ShieldX
-            size={42}
-            className="text-red-500"
-          />
-        </div>
-
-        {/* Heading */}
-        <h1 className="text-3xl font-bold text-slate-800 mb-3">
-          Access Denied
-        </h1>
-
-        {/* Message */}
-        <p className="text-slate-500 leading-7 mb-8">
-          You don't have permission to access this page.
-          This section is available only to administrators.
-        </p>
-
-        {/* Back Button */}
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition"
-        >
-          Back to Dashboard
-        </button>
-
-      </div>
-    </div>
+      <Link
+        to="/dashboard"
+        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition"
+      >
+        <LayoutDashboard size={17} />
+        Back to Dashboard
+      </Link>
+    </StatusPage>
   );
 }
 

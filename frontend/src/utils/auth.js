@@ -1,3 +1,5 @@
+import { API_URL } from "../config";
+
 // =========================
 // SESSION HELPERS
 // =========================
@@ -101,7 +103,7 @@ export const refreshStoredUser = async () => {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/auth/me",
+      `${API_URL}/api/auth/me`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 

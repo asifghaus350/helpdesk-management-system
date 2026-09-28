@@ -29,6 +29,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { updateStoredUser } from "../utils/auth";
+import { API_URL } from "../config";
 
 function Profile() {
   const navigate = useNavigate();
@@ -138,7 +139,7 @@ function Profile() {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/auth/me",
+          `${API_URL}/api/auth/me`,
           {
             method: "GET",
             headers: {
@@ -186,11 +187,11 @@ function Profile() {
         updateStoredUser(currentUser);
 
         // =========================
-        // FETCH ROLE-BASED TICKETS
+        // ROLE-BASED TICKET COUNTS
         // =========================
 
         const ticketResponse = await fetch(
-          "http://localhost:5000/api/tickets",
+          `${API_URL}/api/tickets/stats?recent=0`,
           {
             method: "GET",
             headers: {
@@ -202,33 +203,14 @@ function Profile() {
         const ticketData =
           await ticketResponse.json();
 
-        if (ticketResponse.ok) {
-          const tickets = Array.isArray(
-            ticketData.tickets
-          )
-            ? ticketData.tickets
-            : [];
-
-          const resolvedTickets =
-            tickets.filter(
-              (ticket) =>
-                ticket.status === "Closed"
-            ).length;
-
-          const openTickets =
-            tickets.filter(
-              (ticket) =>
-                ticket.status === "Open"
-            ).length;
+        if (ticketResponse.ok && ticketData.stats) {
+          const { total, byStatus } = ticketData.stats;
 
           setTicketStats({
-            total: tickets.length,
-            resolved: resolvedTickets,
-            open: openTickets,
-            inProgress: tickets.filter(
-              (ticket) =>
-                ticket.status === "In Progress"
-            ).length,
+            total,
+            resolved: byStatus.Closed,
+            open: byStatus.Open,
+            inProgress: byStatus["In Progress"],
           });
         }
       } catch (error) {
@@ -336,7 +318,7 @@ function Profile() {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/users/profile/photo",
+          `${API_URL}/api/users/profile/photo`,
           {
             method: "PUT",
             headers: {
@@ -413,7 +395,7 @@ function Profile() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/users/profile/photo",
+        `${API_URL}/api/users/profile/photo`,
         {
           method: "PUT",
           headers: {
@@ -485,7 +467,7 @@ function Profile() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/users/profile",
+        `${API_URL}/api/users/profile`,
         {
           method: "PUT",
           headers: {
@@ -621,7 +603,7 @@ function Profile() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/change-password",
+        `${API_URL}/api/auth/change-password`,
         {
           method: "PUT",
           headers: {
