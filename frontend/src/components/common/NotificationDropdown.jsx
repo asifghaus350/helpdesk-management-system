@@ -90,7 +90,7 @@ function NotificationDropdown() {
       {/* Dropdown */}
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-xl border border-gray-200 z-50">
+        <div className="fixed inset-x-3 top-18 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-3 sm:w-96 bg-white rounded-2xl shadow-xl border border-gray-200 z-50">
 
           {/* Header */}
 

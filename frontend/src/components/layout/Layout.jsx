@@ -41,6 +41,40 @@ function Layout({ children }) {
 
   const isDark = settings.theme === "dark";
 
+  // =========================
+  // MOBILE SIDEBAR DRAWER
+  // =========================
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+
+    // Esc closes the drawer
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+
+    // Growing to desktop width closes it (sidebar is always shown there)
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const handleResize = (e) => {
+      if (e.matches) setSidebarOpen(false);
+    };
+
+    // Stop the page behind the drawer from scrolling
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    window.addEventListener("keydown", handleKeyDown);
+    desktop.addEventListener("change", handleResize);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      desktop.removeEventListener("change", handleResize);
+    };
+  }, [sidebarOpen]);
+
   return (
     <div
       className={`min-h-screen flex ${
@@ -50,12 +84,18 @@ function Layout({ children }) {
       }`}
     >
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       {/* Main Application Area */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Top Navbar */}
-        <Navbar />
+        <Navbar
+          isMenuOpen={sidebarOpen}
+          onMenuClick={() => setSidebarOpen(true)}
+        />
 
         {/* Page Content */}
         <main
@@ -65,8 +105,8 @@ function Layout({ children }) {
               : "bg-[#f7f8fa] text-slate-800"
           } ${
             settings.compactMode
-              ? "p-4"
-              : "p-6 lg:p-8"
+              ? "p-3 sm:p-4"
+              : "p-4 sm:p-6 lg:p-8"
           }`}
         >
           <div className="w-full max-w-[1600px] mx-auto">

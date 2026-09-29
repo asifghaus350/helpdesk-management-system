@@ -529,7 +529,7 @@ function Reports() {
           <div
             role="group"
             aria-label="Date range"
-            className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-sm"
+            className="flex items-center gap-1 max-w-full overflow-x-auto bg-white border border-slate-200 rounded-xl p-1 shadow-sm"
           >
             {RANGES.map((item) => (
               <button

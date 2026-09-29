@@ -12,9 +12,12 @@ import {
   User,
   FileText,
   LogOut,
+  X,
 } from "lucide-react";
 
-function Sidebar() {
+// Desktop (lg+): always visible, sticky column.
+// Mobile: off-canvas drawer controlled by Layout (isOpen / onClose).
+function Sidebar({ isOpen = false, onClose = () => {} }) {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(getStoredUser);
@@ -82,11 +85,30 @@ function Sidebar() {
   };
 
   return (
-    <aside className="w-[250px] min-h-screen bg-white border-r border-slate-200 flex flex-col sticky top-0">
+    <>
+    {/* Backdrop (mobile only) */}
+
+    <div
+      aria-hidden="true"
+      onClick={onClose}
+      className={`fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${
+        isOpen
+          ? "opacity-100"
+          : "opacity-0 pointer-events-none"
+      }`}
+    />
+
+    <aside
+      id="app-sidebar"
+      aria-label="Main navigation"
+      className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] h-dvh bg-white border-r border-slate-200 flex flex-col shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:z-auto lg:w-62.5 lg:max-w-none lg:h-screen lg:shadow-none lg:translate-x-0 ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
 
       {/* Logo */}
 
-      <div className="px-6 py-6 border-b border-slate-200">
+      <div className="px-6 py-6 border-b border-slate-200 flex items-center justify-between gap-3">
 
         <div className="flex items-center gap-3">
 
@@ -113,11 +135,22 @@ function Sidebar() {
 
         </div>
 
+        {/* Close (mobile only) */}
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close menu"
+          className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X size={20} />
+        </button>
+
       </div>
 
       {/* Navigation */}
 
-      <nav className="flex-1 px-4 py-6">
+      <nav className="flex-1 overflow-y-auto px-4 py-6">
 
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-3">
           Menu
@@ -131,6 +164,7 @@ function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all duration-200 ${
                   isActive
@@ -174,6 +208,7 @@ function Sidebar() {
       </div>
 
     </aside>
+    </>
   );
 }
 
