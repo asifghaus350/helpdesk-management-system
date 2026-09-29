@@ -16,7 +16,13 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import toast from "react-hot-toast";
+
 import Layout from "../components/layout/Layout";
+import {
+  applySettingsLocally,
+  saveSettingsToServer,
+} from "../utils/auth";
 
 const DEFAULT_SETTINGS = {
   emailNotifications: true,
@@ -44,11 +50,10 @@ const notificationOptions = [
   {
     name: "emailNotifications",
     title: "Email notifications",
-    description: "Receive important updates by email.",
+    description:
+      "Also email me when a ticket is assigned to me or its status changes.",
     icon: Mail,
     tile: "bg-violet-50 text-violet-600",
-    // No email is sent yet; the choice is stored for when it is.
-    badge: "Coming soon",
   },
 ];
 
@@ -170,29 +175,49 @@ function Settings() {
     []
   );
 
+  // Account settings can arrive from the server after this page
+  // opens (e.g. changed on another device) — show them.
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem("settings"));
+        if (saved) setSettings({ ...DEFAULT_SETTINGS, ...saved });
+      } catch {
+        // Ignore unreadable cache
+      }
+    };
+
+    window.addEventListener("settingsChanged", handleSettingsChange);
+
+    return () =>
+      window.removeEventListener("settingsChanged", handleSettingsChange);
+  }, []);
+
   // =========================
   // SAVE (every change saves immediately)
   // =========================
 
-  const saveSettings = (updatedSettings) => {
+  const saveSettings = async (updatedSettings) => {
+    const previousSettings = settings;
+
+    // Apply immediately, then save to the account
     setSettings(updatedSettings);
+    applySettingsLocally(updatedSettings);
 
-    localStorage.setItem(
-      "settings",
-      JSON.stringify(updatedSettings)
-    );
+    try {
+      await saveSettingsToServer(updatedSettings);
 
-    document.documentElement.classList.toggle(
-      "dark",
-      updatedSettings.theme === "dark"
-    );
+      // Brief "Saved" confirmation
+      setShowSaved(true);
+      clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setShowSaved(false), 2000);
+    } catch (error) {
+      // Roll back so the screen matches what is really saved
+      setSettings(previousSettings);
+      applySettingsLocally(previousSettings);
 
-    window.dispatchEvent(new Event("settingsChanged"));
-
-    // Brief "Saved" confirmation
-    setShowSaved(true);
-    clearTimeout(savedTimer.current);
-    savedTimer.current = setTimeout(() => setShowSaved(false), 2000);
+      toast.error(error.message || "Could not save settings");
+    }
   };
 
   const updateSetting = (name, value) =>
@@ -475,7 +500,8 @@ function Settings() {
           </section>
 
           <p className="px-1 text-xs text-slate-500 leading-relaxed">
-            Settings are saved on this device as soon as you change them.
+            Settings are saved to your account as soon as you change them,
+            so they follow you to every device.
           </p>
         </aside>
 

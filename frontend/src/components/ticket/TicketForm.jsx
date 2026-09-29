@@ -12,7 +12,6 @@ import {
   Send,
 } from "lucide-react";
 
-import { addNotification } from "../../utils/notificationUtils";
 import { initials } from "../../utils/format";
 import toast from "react-hot-toast";
 import { API_URL } from "../../config";
@@ -316,11 +315,6 @@ function TicketForm({ mode = "create" }) {
           );
         }
 
-        // Notification respects ticketNotifications setting
-        addNotification(
-          `New ticket ${data.ticket.ticketId} has been created.`,
-          "ticket"
-        );
 
         toast.success("Ticket created successfully!");
 
@@ -370,11 +364,6 @@ function TicketForm({ mode = "create" }) {
           );
         }
 
-        // Notification respects ticketNotifications setting
-        addNotification(
-          `Ticket ${id} has been updated.`,
-          "ticket"
-        );
 
         toast.success("Ticket updated successfully!");
 

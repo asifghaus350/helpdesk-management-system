@@ -51,6 +51,31 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    // App settings (saved per account, same on every device)
+    preferences: {
+      theme: {
+        type: String,
+        enum: ["light", "dark"],
+        default: "light",
+      },
+      compactMode: {
+        type: Boolean,
+        default: false,
+      },
+      ticketNotifications: {
+        type: Boolean,
+        default: true,
+      },
+      userNotifications: {
+        type: Boolean,
+        default: true,
+      },
+      emailNotifications: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
     // Forgot Password / Reset Password
     resetPasswordToken: {
       type: String,

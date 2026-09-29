@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
 const Comment = require("../models/Comment");
+const { notify, adminIds } = require("../services/notificationService");
 const User = require("../models/User");
 const Counter = require("../models/Counter");
 
@@ -144,6 +145,33 @@ const createTicket = async (req, res) => {
         message: `Ticket assigned to ${ticket.engineer}`,
         oldValue: "",
         newValue: ticket.engineer,
+      });
+    }
+
+    // =========================
+    // NOTIFICATIONS
+    // =========================
+
+    const ticketLink = `/tickets/${ticket.ticketId}`;
+
+    await notify({
+      recipients: await adminIds(),
+      actor: req.user.id,
+      type: "ticket_created",
+      title: `New ticket ${ticket.ticketId}`,
+      message: `${ticket.title} · ${ticket.priority} priority`,
+      link: ticketLink,
+    });
+
+    if (ticket.engineerId) {
+      await notify({
+        recipients: [ticket.engineerId],
+        actor: req.user.id,
+        type: "ticket_assigned",
+        title: `${ticket.ticketId} was assigned to you`,
+        message: ticket.title,
+        link: ticketLink,
+        email: true,
       });
     }
 
@@ -706,6 +734,42 @@ if (status !== undefined) {
           oldEngineer || "Unassigned",
         newValue:
           ticket.engineer || "Unassigned",
+      });
+    }
+
+    // =========================
+    // NOTIFICATIONS
+    // =========================
+
+    const ticketLink = `/tickets/${ticket.ticketId}`;
+
+    if (
+      oldEngineer !== ticket.engineer &&
+      ticket.engineerId
+    ) {
+      await notify({
+        recipients: [ticket.engineerId],
+        actor: req.user.id,
+        type: "ticket_assigned",
+        title: `${ticket.ticketId} was assigned to you`,
+        message: ticket.title,
+        link: ticketLink,
+        email: true,
+      });
+    }
+
+    if (
+      status !== undefined &&
+      oldStatus !== ticket.status
+    ) {
+      await notify({
+        recipients: [ticket.createdBy, ticket.engineerId],
+        actor: req.user.id,
+        type: "ticket_status",
+        title: `${ticket.ticketId} is now ${ticket.status}`,
+        message: `${ticket.title} · was ${oldStatus}`,
+        link: ticketLink,
+        email: true,
       });
     }
 

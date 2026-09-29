@@ -8,6 +8,7 @@ const {
   deleteUser,
   updateOwnProfile,
   updateProfilePhoto,
+  updatePreferences,
 } = require("../controllers/userController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -71,6 +72,17 @@ router.put(
   "/profile/photo",
   authMiddleware,
   updateProfilePhoto
+);
+
+// =========================
+// UPDATE OWN PREFERENCES
+// ALL AUTHENTICATED USERS
+// =========================
+
+router.put(
+  "/profile/preferences",
+  authMiddleware,
+  updatePreferences
 );
 
 // =========================

@@ -2,6 +2,7 @@ const Comment = require("../models/Comment");
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
 const { checkTicketAccess } = require("../utils/ticketAccess");
+const { notify } = require("../services/notificationService");
 
 // =========================
 // GET TICKET COMMENTS
@@ -116,6 +117,22 @@ const createComment = async (req, res) => {
       message: `Comment added to ticket ${ticket.ticketId}`,
       oldValue: "",
       newValue: message.trim(),
+    });
+
+    // Tell the reporter and the assigned engineer
+    // (the commenter is skipped automatically)
+    const preview = message.trim();
+
+    await notify({
+      recipients: [ticket.createdBy, ticket.engineerId],
+      actor: req.user.id,
+      type: "comment_added",
+      title: `New comment on ${ticket.ticketId}`,
+      message:
+        preview.length > 140
+          ? `${preview.slice(0, 140)}…`
+          : preview,
+      link: `/tickets/${ticket.ticketId}`,
     });
 
     // Get populated comment

@@ -31,7 +31,6 @@ import { useNavigate } from "react-router-dom";
 
 import Layout from "../components/layout/Layout";
 
-import { addNotification } from "../utils/notificationUtils";
 import { getStoredUser } from "../utils/auth";
 import { initials } from "../utils/format";
 import useDebouncedValue from "../utils/useDebouncedValue";
@@ -414,10 +413,6 @@ function UserManagement() {
         // NOTIFICATION
         // =========================
 
-        addNotification(
-          `User ${data.user.name} was updated.`,
-          "user"
-        );
 
         toast.success("User updated successfully!");
 
@@ -491,10 +486,6 @@ function UserManagement() {
       // NOTIFICATION
       // =========================
 
-      addNotification(
-        `User ${data.user.name} was added.`,
-        "user"
-      );
 
       toast.success("User created successfully!");
 
@@ -552,10 +543,6 @@ function UserManagement() {
         );
       }
 
-      addNotification(
-        `User ${user.name} was deleted.`,
-        "user"
-      );
 
       toast.success("User deleted successfully!");
 

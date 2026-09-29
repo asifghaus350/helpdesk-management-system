@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Ticket = require("../models/Ticket");
+const { notify, adminIds } = require("../services/notificationService");
 const {
   parsePagination,
   buildPagination,
@@ -230,6 +231,16 @@ const createUser = async (req, res) => {
       updatedAt: user.updatedAt,
     };
 
+    // Let the other admins know
+    await notify({
+      recipients: await adminIds(),
+      actor: req.user.id,
+      type: "user_created",
+      title: `New user: ${user.name}`,
+      message: `${user.role} · ${user.email}`,
+      link: "/users",
+    });
+
     res.status(201).json({
       success: true,
       message: "User created successfully",
@@ -408,6 +419,15 @@ const deleteUser = async (req, res) => {
 
     await User.deleteOne({
       _id: req.params.id,
+    });
+
+    await notify({
+      recipients: await adminIds(),
+      actor: req.user.id,
+      type: "user_deleted",
+      title: `User removed: ${user.name}`,
+      message: `${user.role} · ${user.email}`,
+      link: "/users",
     });
 
     res.status(200).json({
@@ -671,7 +691,75 @@ const updateProfilePhoto = async (req, res) => {
   }
 };
 
+// =========================
+// UPDATE OWN PREFERENCES
+// ALL AUTHENTICATED USERS
+// =========================
+// PUT /api/users/profile/preferences
+// Body: any of theme, compactMode, ticketNotifications,
+//       userNotifications, emailNotifications
+
+const PREFERENCE_RULES = {
+  theme: (value) => ["light", "dark"].includes(value),
+  compactMode: (value) => typeof value === "boolean",
+  ticketNotifications: (value) => typeof value === "boolean",
+  userNotifications: (value) => typeof value === "boolean",
+  emailNotifications: (value) => typeof value === "boolean",
+};
+
+const updatePreferences = async (req, res) => {
+  try {
+    const updates = {};
+
+    for (const [key, isValid] of Object.entries(PREFERENCE_RULES)) {
+      if (req.body[key] === undefined) continue;
+
+      if (!isValid(req.body[key])) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid value for ${key}`,
+        });
+      }
+
+      updates[`preferences.${key}`] = req.body[key];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No preferences to update",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("preferences");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      preferences: user.preferences,
+    });
+  } catch (error) {
+    console.error("Update preferences error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while saving preferences",
+    });
+  }
+};
+
 module.exports = {
+  updatePreferences,
   getUsers,
   getUserById,
   createUser,

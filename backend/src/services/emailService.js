@@ -86,6 +86,64 @@ HelpDesk Support Team
   await transporter.sendMail(mailOptions);
 };
 
+// Escape text placed inside the HTML email
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+// =========================
+// NOTIFICATION EMAIL
+// =========================
+// Short "something happened on your ticket" email with a button
+// that opens the ticket in the app.
+
+const sendNotificationEmail = async ({ to, title, message, url }) => {
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+
+  await transporter.sendMail({
+    from: `"HelpDesk Support" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `HelpDesk - ${title}`,
+    text: `${title}
+
+${message}
+
+${url ? `Open in HelpDesk: ${url}` : ""}
+
+You can turn off email notifications in HelpDesk → Settings.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; background:#f8fafc; padding:40px;">
+        <div style="max-width:600px; margin:auto; background:#ffffff; padding:32px; border-radius:12px; border:1px solid #e2e8f0;">
+          <h2 style="color:#1e293b; margin:0 0 12px;">${safeTitle}</h2>
+
+          <p style="color:#475569; line-height:1.6; margin:0;">${safeMessage}</p>
+
+          ${
+            url
+              ? `<div style="margin:28px 0;">
+                  <a href="${escapeHtml(url)}" style="display:inline-block; background:#2563eb; color:#ffffff; text-decoration:none; padding:12px 22px; border-radius:8px; font-weight:600;">
+                    Open in HelpDesk
+                  </a>
+                </div>`
+              : ""
+          }
+
+          <hr style="border:none; border-top:1px solid #e2e8f0; margin:28px 0;" />
+
+          <p style="color:#94a3b8; font-size:12px; margin:0;">
+            You can turn off email notifications in HelpDesk → Settings.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+};
+
 module.exports = {
   sendPasswordResetEmail,
+  sendNotificationEmail,
 };

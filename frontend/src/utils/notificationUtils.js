@@ -1,156 +1,47 @@
-// Notifications are stored per logged-in user so people
-// sharing a browser don't see each other's notifications.
+import { API_URL } from "../config";
 
-const storageKey = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    return `notifications:${user?.id || "guest"}`;
-  } catch {
-    return "notifications:guest";
+// =========================
+// NOTIFICATIONS API
+// =========================
+// Notifications are created by the backend (ticket assigned,
+// status changed, new comment, …) and stored per user, so they
+// follow the account across browsers and devices.
+
+const request = async (path, options = {}) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/api/notifications${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Notification request failed");
   }
+
+  return data;
 };
 
-const saveNotifications = (notifications) => {
-  localStorage.setItem(
-    storageKey(),
-    JSON.stringify(notifications)
-  );
+// { notifications, unreadCount }
+export const fetchNotifications = (limit = 20) =>
+  request(`?limit=${limit}`);
 
-  window.dispatchEvent(
-    new Event("notificationsUpdated")
-  );
-
-  return notifications;
-};
-
-export const getNotifications = () => {
-  try {
-    return (
-      JSON.parse(localStorage.getItem(storageKey())) || []
-    );
-  } catch {
-    return [];
-  }
-};
-
-// =========================
-// DISPLAY TIME
-// =========================
-
-export const formatNotificationTime = (notification) => {
-  // Older notifications only had a fixed "Just now" label
-  if (!notification.createdAt) {
-    return notification.time || "";
-  }
-
-  const seconds = Math.floor(
-    (Date.now() - new Date(notification.createdAt).getTime()) /
-      1000
-  );
-
-  if (seconds < 60) return "Just now";
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-
-  return new Date(notification.createdAt).toLocaleDateString();
-};
-
-// =========================
-// ADD NOTIFICATION
-// =========================
-
-export const addNotification = (
-  message,
-  type = "general"
-) => {
-
-  // Get saved application settings
-  let settings;
-
-  try {
-    settings =
-      JSON.parse(localStorage.getItem("settings")) || {};
-  } catch {
-    settings = {};
-  }
-
-  // =========================
-  // CHECK NOTIFICATION SETTINGS
-  // =========================
-
-  if (
-    type === "ticket" &&
-    settings.ticketNotifications === false
-  ) {
-    return null;
-  }
-
-  if (
-    type === "user" &&
-    settings.userNotifications === false
-  ) {
-    return null;
-  }
-
-  // =========================
-  // CREATE NOTIFICATION
-  // =========================
-
-  const newNotification = {
-    id: Date.now(),
-    message,
-    type,
-    createdAt: new Date().toISOString(),
-    read: false,
-  };
-
-  // Keep the list bounded
-  saveNotifications(
-    [newNotification, ...getNotifications()].slice(0, 50)
-  );
-
-  return newNotification;
-};
-
-// =========================
-// MARK ONE AS READ
-// =========================
+export const fetchUnreadCount = async () =>
+  (await request("/unread-count")).unreadCount;
 
 export const markNotificationAsRead = (id) =>
-  saveNotifications(
-    getNotifications().map((notification) =>
-      notification.id === id
-        ? { ...notification, read: true }
-        : notification
-    )
-  );
-
-// =========================
-// DELETE NOTIFICATION
-// =========================
-
-export const deleteNotification = (id) =>
-  saveNotifications(
-    getNotifications().filter(
-      (notification) => notification.id !== id
-    )
-  );
-
-// =========================
-// MARK ALL AS READ
-// =========================
+  request(`/${id}/read`, { method: "PATCH" });
 
 export const markAllNotificationsAsRead = () =>
-  saveNotifications(
-    getNotifications().map((notification) => ({
-      ...notification,
-      read: true,
-    }))
-  );
+  request("/read-all", { method: "PATCH" });
+
+export const deleteNotification = (id) =>
+  request(`/${id}`, { method: "DELETE" });
+
+export const clearAllNotifications = () =>
+  request("", { method: "DELETE" });

@@ -130,6 +130,7 @@ const loginUser = async (req, res) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      preferences: user.preferences,
     };
 
     res.status(200).json({
@@ -175,6 +176,7 @@ const getMe = async (req, res) => {
         phone: user.phone,
         department: user.department,
         profilePhoto: user.profilePhoto,
+        preferences: user.preferences,
       },
     });
   } catch (error) {

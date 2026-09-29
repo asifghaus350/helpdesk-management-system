@@ -15,8 +15,83 @@ export const clearSession = () => {
 // that can be several MB) is kept under its own key, so a
 // photo too big for localStorage never breaks saving the
 // rest of the user.
+// =========================
+// SETTINGS (theme, compact mode, notification switches)
+// =========================
+// Saved on the account (server) and cached in localStorage so the
+// layout can apply the theme instantly on the next page load.
+
+const SETTING_KEYS = [
+  "theme",
+  "compactMode",
+  "ticketNotifications",
+  "userNotifications",
+  "emailNotifications",
+];
+
+export const applySettingsLocally = (settings) => {
+  let current;
+
+  try {
+    current = JSON.parse(localStorage.getItem("settings")) || {};
+  } catch {
+    current = {};
+  }
+
+  const next = { ...current };
+
+  SETTING_KEYS.forEach((key) => {
+    if (settings[key] !== undefined) next[key] = settings[key];
+  });
+
+  localStorage.setItem("settings", JSON.stringify(next));
+
+  document.documentElement.classList.toggle(
+    "dark",
+    next.theme === "dark"
+  );
+
+  window.dispatchEvent(new Event("settingsChanged"));
+
+  return next;
+};
+
+// Saves settings to the account. Returns the saved preferences.
+export const saveSettingsToServer = async (settings) => {
+  const body = {};
+
+  SETTING_KEYS.forEach((key) => {
+    if (settings[key] !== undefined) body[key] = settings[key];
+  });
+
+  const response = await fetch(
+    `${API_URL}/api/users/profile/preferences`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Could not save settings");
+  }
+
+  return data.preferences;
+};
+
 export const updateStoredUser = (fields = {}) => {
   const { profilePhoto, ...rest } = fields;
+
+  // Account settings from the server win over this browser's cache
+  if (rest.preferences) {
+    applySettingsLocally(rest.preferences);
+  }
 
   let current;
 

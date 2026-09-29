@@ -102,6 +102,7 @@ const googleLogin = async (req, res) => {
         phone: user.phone || "",
         department: user.department || "",
         profilePicture: picture || "",
+        preferences: user.preferences,
       },
     });
   } catch (error) {
