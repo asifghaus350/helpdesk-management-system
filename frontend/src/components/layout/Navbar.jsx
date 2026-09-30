@@ -319,6 +319,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
           {user?.profilePhoto ? (
   <img
     src={user.profilePhoto}
+    referrerPolicy="no-referrer"
     alt="Profile"
     className="w-9 h-9 lg:w-10 lg:h-10 rounded-full object-cover border-2 border-blue-100"
   />

@@ -948,6 +948,7 @@ function Profile() {
                 {/* Profile photo as a soft, blurred cover */}
                 <img
                   src={profile.profilePhoto}
+                  referrerPolicy="no-referrer"
                   alt=""
                   aria-hidden="true"
                   className="absolute inset-0 w-full h-full object-cover scale-125 blur-md"
@@ -973,6 +974,7 @@ function Profile() {
                 {profile.profilePhoto ? (
                   <img
                     src={profile.profilePhoto}
+                    referrerPolicy="no-referrer"
                     alt="Profile"
                     className="w-full h-full rounded-2xl object-cover ring-4 ring-white shadow-md"
                   />

@@ -635,6 +635,9 @@ function UserManagement() {
   const isSelf = (user) =>
     String(user._id) === String(currentUser?.id);
 
+  // Editing your own account: role and status are locked
+  const editingSelf = Boolean(editingUser && isSelf(editingUser));
+
   // Submit guard so a double click can't create two users
   const submitUser = async (e) => {
     if (submitting) {
@@ -944,6 +947,7 @@ function UserManagement() {
                           {user.profilePhoto ? (
                             <img
                               src={user.profilePhoto}
+                              referrerPolicy="no-referrer"
                               alt=""
                               className="w-10 h-10 rounded-full object-cover shrink-0"
                             />
@@ -1340,6 +1344,13 @@ function UserManagement() {
                 <div>
                   <p className={labelClass}>Role</p>
 
+                  {editingSelf && (
+                    <p className="-mt-0.5 mb-2 text-xs text-slate-500">
+                      You can't change your own role or status. Ask
+                      another admin if this needs to change.
+                    </p>
+                  )}
+
                   <div
                     role="radiogroup"
                     aria-label="Role"
@@ -1355,12 +1366,13 @@ function UserManagement() {
                           type="button"
                           role="radio"
                           aria-checked={isSelected}
+                          disabled={editingSelf}
                           onClick={() =>
                             handleChange({
                               target: { name: "role", value },
                             })
                           }
-                          className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition ${
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                             isSelected
                               ? style.selected
                               : "border-slate-200 hover:border-slate-300"
@@ -1405,6 +1417,7 @@ function UserManagement() {
                     role="switch"
                     aria-checked={formData.status === "Active"}
                     aria-label="Account active"
+                    disabled={editingSelf}
                     onClick={() =>
                       handleChange({
                         target: {
@@ -1416,7 +1429,7 @@ function UserManagement() {
                         },
                       })
                     }
-                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:cursor-not-allowed disabled:opacity-60 ${
                       formData.status === "Active"
                         ? "bg-emerald-500"
                         : "bg-slate-300"
