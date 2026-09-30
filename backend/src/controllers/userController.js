@@ -22,6 +22,55 @@ const syncEngineerName = async (user) => {
 };
 
 // =========================
+// ADMIN SAFETY RULES
+// =========================
+// The system must always keep at least one active Admin, and an
+// admin can't lock themselves out by changing their own role or
+// status. Returns an error message, or "" when the change is fine.
+
+const isActiveAdmin = (user) =>
+  user.role === "Admin" && user.status === "Active";
+
+const adminChangeProblem = async ({
+  target,
+  actorId,
+  nextRole = target.role,
+  nextStatus = target.status,
+  deleting = false,
+}) => {
+  const isSelf = target._id.toString() === actorId.toString();
+
+  if (isSelf && deleting) {
+    return "You can't delete your own account.";
+  }
+
+  if (
+    isSelf &&
+    (nextRole !== target.role || nextStatus !== target.status)
+  ) {
+    return "You can't change your own role or status. Ask another admin to do it.";
+  }
+
+  const losesAdmin =
+    isActiveAdmin(target) &&
+    (deleting || nextRole !== "Admin" || nextStatus !== "Active");
+
+  if (losesAdmin) {
+    const otherActiveAdmins = await User.countDocuments({
+      _id: { $ne: target._id },
+      role: "Admin",
+      status: "Active",
+    });
+
+    if (otherActiveAdmins === 0) {
+      return "This is the only active Admin. Make another user an active Admin first.";
+    }
+  }
+
+  return "";
+};
+
+// =========================
 // GET ALL USERS
 // =========================
 
@@ -284,6 +333,38 @@ const updateUser = async (req, res) => {
     }
 
     // =========================
+    // VALIDATE ROLE / STATUS
+    // =========================
+
+    if (role !== undefined && !ROLES.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role. Allowed roles are Admin, Engineer and User.",
+      });
+    }
+
+    if (status !== undefined && !USER_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Allowed statuses are Active and Inactive.",
+      });
+    }
+
+    const problem = await adminChangeProblem({
+      target: user,
+      actorId: req.user.id,
+      nextRole: role ?? user.role,
+      nextStatus: status ?? user.status,
+    });
+
+    if (problem) {
+      return res.status(400).json({
+        success: false,
+        message: problem,
+      });
+    }
+
+    // =========================
     // UPDATE NAME
     // =========================
 
@@ -414,6 +495,19 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found",
+      });
+    }
+
+    const problem = await adminChangeProblem({
+      target: user,
+      actorId: req.user.id,
+      deleting: true,
+    });
+
+    if (problem) {
+      return res.status(400).json({
+        success: false,
+        message: problem,
       });
     }
 

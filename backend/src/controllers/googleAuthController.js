@@ -79,6 +79,17 @@ const googleLogin = async (req, res) => {
       });
     }
 
+    // Use the Google profile picture when the user hasn't uploaded
+    // their own photo (an uploaded photo is never overwritten).
+    if (
+      !user.profilePhoto &&
+      typeof picture === "string" &&
+      picture.startsWith("https://")
+    ) {
+      user.profilePhoto = picture;
+      await user.save();
+    }
+
     // Prevent inactive users from logging in
     if (user.status !== "Active") {
       return res.status(403).json({
@@ -112,7 +123,7 @@ const googleLogin = async (req, res) => {
         status: user.status,
         phone: user.phone || "",
         department: user.department || "",
-        profilePicture: picture || "",
+        profilePhoto: user.profilePhoto || "",
         preferences: user.preferences,
       },
     });
