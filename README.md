@@ -14,6 +14,7 @@ Built with **React 19 + Vite + Tailwind CSS 4** on the frontend and **Node.js + 
 - Status workflow: **Open → In Progress → Closed**
 - Server-side search, filtering (status, priority, category) and pagination
 - Ticket details page with a conversation thread (comments) and a full activity history
+- File attachments (screenshots, PDFs, logs, documents): drag and drop, image previews and downloads. Files are stored in MongoDB GridFS, so they survive server restarts
 
 ### Roles and access
 
@@ -70,7 +71,7 @@ Access rules are enforced on the backend. The UI only shows the actions a role i
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, Vite 7, React Router 7, Tailwind CSS 4, Recharts, lucide-react, react-hot-toast |
-| Backend | Node.js, Express 5, Mongoose 9 (MongoDB) |
+| Backend | Node.js, Express 5, Mongoose 9 (MongoDB), Multer + GridFS for file uploads |
 | Auth | JSON Web Tokens, bcryptjs, Firebase Authentication (Google sign-in) |
 | Email | Nodemailer (SMTP) |
 | Security | helmet, express-rate-limit, CORS |
@@ -255,6 +256,20 @@ All routes are prefixed with `/api`. Apart from login, register, Google login an
 </details>
 
 <details>
+<summary><strong>Attachments</strong> — <code>/api/attachments</code></summary>
+
+Allowed types: PNG, JPG, GIF, WebP, PDF, TXT, LOG, CSV, DOCX and XLSX. Up to 5 files per upload, 5 MB each.
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/ticket/:ticketId` | Files attached to a ticket |
+| POST | `/ticket/:ticketId` | Upload files (`multipart/form-data`, field `files`) |
+| GET | `/:id/download` | Download a file (`?inline=1` previews images and PDFs) |
+| DELETE | `/:id` | Delete a file (uploader or Admin) |
+
+</details>
+
+<details>
 <summary><strong>Users</strong> — <code>/api/users</code></summary>
 
 | Method | Route | Description |
@@ -301,6 +316,6 @@ The frontend and backend are deployed separately. For example, the backend can g
 
 ## Roadmap
 
-- [ ] File attachments on tickets and comments
+- [ ] Attach files directly to individual comments
 - [ ] Store when a ticket was closed, to report average resolution time
 - [ ] Automated tests for the API and the UI

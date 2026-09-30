@@ -16,6 +16,7 @@ import {
 import Layout from "../components/layout/Layout";
 import TicketComments from "../components/ticket/TicketComments";
 import TicketActivity from "../components/ticket/TicketActivity";
+import TicketAttachments from "../components/ticket/TicketAttachments";
 
 import {
   getStoredUser,
@@ -460,6 +461,13 @@ function TicketDetails() {
               {ticket.description}
             </p>
           </section>
+
+          {/* ATTACHMENTS */}
+
+          <TicketAttachments
+            ticketId={ticket.ticketId}
+            onChange={refreshActivity}
+          />
 
           {/* CONVERSATION */}
 

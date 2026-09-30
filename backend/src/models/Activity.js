@@ -38,6 +38,8 @@ const activitySchema = new mongoose.Schema(
         "Comment Updated",
         "Comment Deleted",
         "Ticket Deleted",
+        "Attachment Added",
+        "Attachment Removed",
       ],
       required: true,
     },

@@ -9,6 +9,7 @@ import {
   Trash2,
   PlusCircle,
   ArrowRight,
+  Paperclip,
 } from "lucide-react";
 
 import { timeAgo } from "../../utils/format";
@@ -59,6 +60,10 @@ function TicketActivity({ ticketId, refreshKey = 0 }) {
       case "Ticket Deleted":
         return <Trash2 size={15} />;
 
+      case "Attachment Added":
+      case "Attachment Removed":
+        return <Paperclip size={15} />;
+
       default:
         return <Activity size={15} />;
     }
@@ -89,6 +94,10 @@ function TicketActivity({ ticketId, refreshKey = 0 }) {
 
       case "Ticket Deleted":
         return "bg-red-50 text-red-600 ring-red-100";
+
+      case "Attachment Added":
+      case "Attachment Removed":
+        return "bg-cyan-50 text-cyan-600 ring-cyan-100";
 
       default:
         return "bg-slate-50 text-slate-600 ring-slate-100";

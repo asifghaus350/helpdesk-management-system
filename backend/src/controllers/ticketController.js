@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
 const Comment = require("../models/Comment");
+const { deleteTicketAttachments } = require("./attachmentController");
 const { notify, adminIds } = require("../services/notificationService");
 const User = require("../models/User");
 const Counter = require("../models/Counter");
@@ -845,6 +846,7 @@ const deleteTicket = async (req, res) => {
     // Delete the ticket and its comments
     await Ticket.findByIdAndDelete(ticket._id);
     await Comment.deleteMany({ ticket: ticket._id });
+    await deleteTicketAttachments(ticket._id);
 
     // IMPORTANT:
     // Do NOT delete the ticket's activities.

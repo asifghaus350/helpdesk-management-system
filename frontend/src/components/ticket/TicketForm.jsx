@@ -10,11 +10,19 @@ import {
   LoaderCircle,
   Save,
   Send,
+  Paperclip,
+  X,
 } from "lucide-react";
 
 import { initials } from "../../utils/format";
 import toast from "react-hot-toast";
 import { API_URL } from "../../config";
+import AttachmentDropzone from "./AttachmentDropzone";
+import {
+  uploadAttachments,
+  validateFiles,
+  formatBytes,
+} from "../../utils/attachments";
 
 function TicketForm({ mode = "create" }) {
   const navigate = useNavigate();
@@ -76,6 +84,24 @@ function TicketForm({ mode = "create" }) {
   );
 
   const [error, setError] = useState("");
+
+  // Files chosen on the create form; uploaded right after the
+  // ticket is created (the ticket id is needed first).
+  const [pendingFiles, setPendingFiles] = useState([]);
+
+  const addPendingFiles = (files) => {
+    const problem = validateFiles(files, pendingFiles.length);
+
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+
+    setPendingFiles((prev) => [...prev, ...files]);
+  };
+
+  const removePendingFile = (index) =>
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
 
   // =========================
   // FETCH ACTIVE ENGINEERS
@@ -316,9 +342,28 @@ function TicketForm({ mode = "create" }) {
         }
 
 
+        const newTicketId = data.ticket.ticketId;
+
+        if (pendingFiles.length > 0) {
+          try {
+            await uploadAttachments(newTicketId, pendingFiles);
+          } catch (uploadError) {
+            // The ticket exists; files can be added from its page
+            toast.error(
+              `Ticket created, but the files were not uploaded: ${uploadError.message}`
+            );
+            navigate(`/tickets/${newTicketId}`);
+            return;
+          }
+        }
+
         toast.success("Ticket created successfully!");
 
-        navigate("/tickets");
+        navigate(
+          pendingFiles.length > 0
+            ? `/tickets/${newTicketId}`
+            : "/tickets"
+        );
 
         return;
       }
@@ -577,6 +622,56 @@ function TicketForm({ mode = "create" }) {
               className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-800 leading-relaxed outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition resize-y min-h-36"
             />
           </div>
+
+          {/* ATTACHMENTS (create only; edit happens on the ticket page) */}
+
+          {mode === "create" && (
+            <div>
+              <p className={labelClass}>
+                Attachments{" "}
+                <span className="font-normal text-slate-400">
+                  (optional)
+                </span>
+              </p>
+
+              <AttachmentDropzone
+                onFiles={addPendingFiles}
+                disabled={loading}
+                busy={loading && pendingFiles.length > 0}
+              />
+
+              {pendingFiles.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {pendingFiles.map((file, index) => (
+                    <li
+                      key={`${file.name}-${index}`}
+                      className="inline-flex items-center gap-2 max-w-full rounded-lg border border-slate-200 bg-slate-50 pl-2.5 pr-1 py-1 text-sm"
+                    >
+                      <Paperclip size={14} className="text-slate-400 shrink-0" />
+
+                      <span className="truncate max-w-48 text-slate-700">
+                        {file.name}
+                      </span>
+
+                      <span className="text-xs text-slate-400 shrink-0">
+                        {formatBytes(file.size)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => removePendingFile(index)}
+                        disabled={loading}
+                        aria-label={`Remove ${file.name}`}
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {/* =========================

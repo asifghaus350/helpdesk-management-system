@@ -12,6 +12,7 @@ const userRoutes = require("./routes/userRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const attachmentRoutes = require("./routes/attachmentRoutes");
 
 const connectDB = require("./config/db");
 const backfillEngineerIds = require("./utils/backfillEngineerIds");
@@ -93,6 +94,12 @@ app.use("/api/activities", activityRoutes);
 // =========================
 
 app.use("/api/notifications", notificationRoutes);
+
+// =========================
+// ATTACHMENT ROUTES
+// =========================
+
+app.use("/api/attachments", attachmentRoutes);
 
 // =========================
 // TEST ROUTE
