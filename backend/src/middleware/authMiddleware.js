@@ -42,13 +42,28 @@ const authMiddleware = async (req, res, next) => {
     // deactivated or re-roled users take effect at once
     // instead of when their token expires.
     const user = await User.findById(decoded.id).select(
-      "role status"
+      "role status passwordChangedAt"
     );
 
     if (!user || user.status !== "Active") {
       return res.status(401).json({
         success: false,
         message: "Account is no longer active",
+      });
+    }
+
+    // Token was issued before the last password change
+    // (e.g. someone else was logged in with the old password).
+    // (JWT "iat" is in whole seconds, so compare in seconds: a new
+    // token signed in the same second as the change stays valid.)
+    if (
+      user.passwordChangedAt &&
+      decoded.iat <
+        Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Your password was changed. Please log in again.",
       });
     }
 

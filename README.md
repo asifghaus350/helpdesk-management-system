@@ -60,6 +60,9 @@ Access rules are enforced on the backend. The UI only shows the actions a role i
 ### Security
 - Passwords hashed with bcrypt; JWT authentication
 - The role and status of each request are re-checked against the database, so a deactivated or demoted user loses access immediately
+- Changing or resetting a password signs out every other session
+- Google sign-in only accepts email addresses Google has verified
+- The activity history is written by the server only and can't be edited through the API
 - `helmet` security headers and a CORS allow-list
 - Rate limiting on login, Google login, forgot password and reset password
 - Request size limits and a JSON error handler

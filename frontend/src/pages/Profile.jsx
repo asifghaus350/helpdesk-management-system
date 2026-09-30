@@ -627,6 +627,12 @@ function Profile() {
         );
       }
 
+      // The old token no longer works after a password change;
+      // keep this session alive with the fresh one.
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+
       setPasswordData({
         currentPassword: "",
         newPassword: "",
@@ -634,7 +640,7 @@ function Profile() {
       });
 
       setPasswordSuccess(
-        "Password changed successfully!"
+        "Password changed. You've been signed out on your other devices."
       );
     } catch (error) {
       console.error(

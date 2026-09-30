@@ -2,7 +2,6 @@ const express = require("express");
 
 const {
   getTicketActivities,
-  createActivity,
   deleteTicketActivities,
 } = require("../controllers/activityController");
 
@@ -20,15 +19,10 @@ router.get(
   getTicketActivities
 );
 
-// =========================
-// CREATE ACTIVITY
-// =========================
-
-router.post(
-  "/",
-  authMiddleware,
-  createActivity
-);
+// Activities are written only by the server when something
+// actually happens (ticket created, status changed, comment, …).
+// There is deliberately no POST route, so nobody can add fake
+// entries to a ticket's audit history.
 
 // =========================
 // DELETE TICKET ACTIVITIES

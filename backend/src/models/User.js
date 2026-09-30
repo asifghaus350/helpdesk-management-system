@@ -76,6 +76,13 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    // Set whenever the password changes. Login tokens issued
+    // before this moment stop working (see authMiddleware).
+    passwordChangedAt: {
+      type: Date,
+      default: null,
+    },
+
     // Forgot Password / Reset Password
     resetPasswordToken: {
       type: String,
@@ -91,5 +98,13 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Covers every way a password changes: change password, reset
+// password and an admin setting a new one.
+userSchema.pre("save", function markPasswordChange() {
+  if (this.isModified("password") && !this.isNew) {
+    this.passwordChangedAt = new Date();
+  }
+});
 
 module.exports = mongoose.model("User", userSchema);

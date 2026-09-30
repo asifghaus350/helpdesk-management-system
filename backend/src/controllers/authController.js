@@ -277,9 +277,24 @@ const changePassword = async (req, res) => {
 
     await user.save();
 
+    // Every other session is now signed out; give this one a
+    // fresh token so the user stays logged in here.
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
+
     res.status(200).json({
       success: true,
-      message: "Password changed successfully",
+      message:
+        "Password changed successfully. Other devices have been signed out.",
+      token,
     });
   } catch (error) {
     console.error(

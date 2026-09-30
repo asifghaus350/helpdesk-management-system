@@ -43,6 +43,17 @@ const googleLogin = async (req, res) => {
       });
     }
 
+    // Only trust an email the provider has verified. Otherwise anyone
+    // could sign in with an unverified address and be linked to the
+    // existing HelpDesk account that uses it.
+    if (decodedToken.email_verified !== true) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your Google email address is not verified. Please verify it with Google and try again.",
+      });
+    }
+
     // Find existing user
     let user = await User.findOne({
       email: email.toLowerCase(),
