@@ -1,6 +1,6 @@
 # GitHub language bar (Linguist)
 # Markdown, JSON and SVG are hidden by default; show them too.
-*.md   linguist-detectable=true
+*.md   linguist-detectable=true linguist-documentation=false
 *.json linguist-detectable=true
 *.svg  linguist-detectable=true
 
