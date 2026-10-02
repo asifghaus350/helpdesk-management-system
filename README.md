@@ -4,6 +4,8 @@ A full-stack support desk where users raise tickets, admins assign them to engin
 
 Built with **React 19 + Vite + Tailwind CSS 4** on the frontend and **Node.js + Express 5 + MongoDB (Mongoose)** on the backend.
 
+![HelpDesk dashboard](screenshots/dashboard.png)
+
 ---
 
 ## Features
@@ -70,6 +72,37 @@ Access rules are enforced on the backend. The UI only shows the actions a role i
 - `helmet` security headers and a CORS allow-list
 - Rate limiting on login, Google login, forgot password and reset password
 - Request size limits and a JSON error handler
+
+---
+
+## Screenshots
+
+> Shown with demo data.
+
+| Tickets | Ticket details |
+|---|---|
+| ![Ticket list with status tabs, filters and pagination](screenshots/tickets.png) | ![Ticket details with conversation, attachments and activity](screenshots/ticket-details.png) |
+| **Create ticket** | **Reports** |
+| ![Create ticket form with live preview](screenshots/create-ticket.png) | ![Reports with charts and engineer workload](screenshots/reports.png) |
+| **User management** | **Notifications** |
+| ![User management with roles and Owner badge](screenshots/users.png) | ![Notification panel](screenshots/notifications.png) |
+| **Sign in** | **Dark mode** |
+| ![Sign-in page](screenshots/login.png) | ![Dashboard in dark mode](screenshots/dark-dashboard.png) |
+
+<details>
+<summary><strong>More: dark ticket details and mobile</strong></summary>
+
+<br>
+
+![Ticket details in dark mode](screenshots/dark-ticket-details.png)
+
+<p>
+  <img src="screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="260">
+  &nbsp;&nbsp;
+  <img src="screenshots/mobile-tickets.png" alt="Ticket list on a phone" width="260">
+</p>
+
+</details>
 
 ---
 
