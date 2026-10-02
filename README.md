@@ -41,7 +41,8 @@ Access rules are enforced on the backend. The UI only shows the actions a role i
 - Role-aware dashboard: ticket counts, status breakdown, active tickets by priority, recent tickets
 - Reports page:
   - date range filter (7 / 30 / 90 days / all time)
-  - tickets-created trend
+  - created vs closed trend
+  - average resolution time (from when each ticket was opened to when it was closed)
   - status, priority and category charts
   - engineer workload
   - CSV export
@@ -59,6 +60,7 @@ Access rules are enforced on the backend. The UI only shows the actions a role i
 
 ### Security
 - Passwords hashed with bcrypt; JWT authentication
+- Request validation on every write route (types, email and phone format, lengths, allowed values), so bad input gets a clear `400`
 - The role and status of each request are re-checked against the database, so a deactivated or demoted user loses access immediately
 - Changing or resetting a password signs out every other session
 - Google sign-in only accepts email addresses Google has verified
@@ -320,5 +322,4 @@ The frontend and backend are deployed separately. For example, the backend can g
 ## Roadmap
 
 - [ ] Attach files directly to individual comments
-- [ ] Store when a ticket was closed, to report average resolution time
 - [ ] Automated tests for the API and the UI

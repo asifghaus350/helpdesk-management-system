@@ -16,6 +16,7 @@ const attachmentRoutes = require("./routes/attachmentRoutes");
 
 const connectDB = require("./config/db");
 const backfillEngineerIds = require("./utils/backfillEngineerIds");
+const backfillClosedAt = require("./utils/backfillClosedAt");
 
 const app = express();
 
@@ -170,6 +171,7 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   await backfillEngineerIds();
+  await backfillClosedAt();
 
   app.listen(PORT, () => {
     console.log(

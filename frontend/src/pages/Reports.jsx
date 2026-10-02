@@ -6,6 +6,7 @@ import {
   LoaderCircle,
   CheckCircle,
   Percent,
+  Timer,
   UserX,
   Download,
   BarChart3,
@@ -26,7 +27,7 @@ import {
 } from "recharts";
 
 import Layout from "../components/layout/Layout";
-import { initials } from "../utils/format";
+import { initials, formatDuration } from "../utils/format";
 import { API_URL } from "../config";
 
 // =========================
@@ -73,7 +74,7 @@ const shortDate = (date) =>
 // TOOLTIP
 // =========================
 
-function ChartTooltip({ active, payload, label }) {
+function ChartTooltip({ active, payload, label, showTotal = true }) {
   if (!active || !payload?.length) {
     return null;
   }
@@ -117,7 +118,7 @@ function ChartTooltip({ active, payload, label }) {
         </div>
       ))}
 
-      {rows.length > 1 && (
+      {showTotal && rows.length > 1 && (
         <div className="flex justify-between gap-4 mt-1.5 pt-1.5 border-t border-slate-100 text-slate-500">
           <span>Total</span>
           <span className="font-semibold text-slate-800">
@@ -300,6 +301,24 @@ function Reports() {
       ).length,
     }));
 
+    // Tickets closed in this period (by closedAt, whenever created)
+    const closedInRange = tickets.filter((ticket) => {
+      if (ticket.status !== "Closed" || !ticket.closedAt) return false;
+
+      const closed = new Date(ticket.closedAt).getTime();
+      return !since || closed >= since;
+    });
+
+    const avgResolutionMs = closedInRange.length
+      ? closedInRange.reduce(
+          (sum, ticket) =>
+            sum +
+            (new Date(ticket.closedAt).getTime() -
+              new Date(ticket.createdAt).getTime()),
+          0
+        ) / closedInRange.length
+      : null;
+
     // Created over time: daily up to 30 days, weekly beyond
     const earliest = inRange.reduce(
       (min, ticket) =>
@@ -337,6 +356,10 @@ function Reports() {
             const created = new Date(ticket.createdAt).getTime();
             return created >= bucketStart && created < bucketEnd;
           }).length,
+          Closed: closedInRange.filter((ticket) => {
+            const closed = new Date(ticket.closedAt).getTime();
+            return closed >= bucketStart && closed < bucketEnd;
+          }).length,
         };
       }
     );
@@ -373,6 +396,8 @@ function Reports() {
       byStatus,
       unassigned,
       resolutionRate: percent(byStatus.Closed, total),
+      closedCount: closedInRange.length,
+      avgResolutionMs,
       statusData,
       priorityData,
       categoryData,
@@ -396,6 +421,7 @@ function Reports() {
       "Engineer",
       "Created By",
       "Created At",
+      "Closed At",
       "Updated At",
     ];
 
@@ -411,6 +437,7 @@ function Reports() {
       ticket.engineer || "Unassigned",
       ticket.createdBy?.name || "",
       ticket.createdAt,
+      ticket.closedAt || "",
       ticket.updatedAt,
     ]);
 
@@ -442,8 +469,8 @@ function Reports() {
         <div className="space-y-6 animate-pulse">
           <div className="h-16 rounded-2xl bg-slate-200 max-w-md" />
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((item) => (
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7].map((item) => (
               <div
                 key={item}
                 className="h-24 rounded-2xl bg-slate-200"
@@ -490,6 +517,15 @@ function Reports() {
       value: `${report.resolutionRate}%`,
       icon: Percent,
       tile: "bg-violet-50 text-violet-600",
+    },
+    {
+      label: "Avg. Resolution",
+      value: formatDuration(report.avgResolutionMs),
+      icon: Timer,
+      tile: "bg-cyan-50 text-cyan-600",
+      hint: report.closedCount
+        ? `${report.closedCount} closed`
+        : "none closed",
     },
     {
       label: "Unassigned",
@@ -571,7 +607,7 @@ function Reports() {
           KPI TILES
       ========================= */}
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
         {statCards.map((card) => {
           const Icon = card.icon;
 
@@ -647,11 +683,26 @@ function Reports() {
           ========================= */}
 
           <ChartCard
-            title="Tickets created"
+            title="Created vs closed"
             subtitle={`${
               report.bucketDays === 1 ? "Per day" : "Per week"
             } · ${range.days ? `last ${range.label}` : "all time"}`}
           >
+            <div className="flex flex-wrap items-center gap-4 mb-3 text-xs text-slate-600">
+              {[
+                ["Created", SERIES_COLOR],
+                ["Closed", STATUS_COLORS.Closed],
+              ].map(([name, color]) => (
+                <span key={name} className="inline-flex items-center gap-1.5">
+                  <span
+                    className="w-3 h-0.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  {name}
+                </span>
+              ))}
+            </div>
+
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
@@ -662,6 +713,11 @@ function Reports() {
                     <linearGradient id="createdFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.25} />
                       <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0} />
+                    </linearGradient>
+
+                    <linearGradient id="closedFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={STATUS_COLORS.Closed} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={STATUS_COLORS.Closed} stopOpacity={0} />
                     </linearGradient>
                   </defs>
 
@@ -687,7 +743,7 @@ function Reports() {
                   />
 
                   <Tooltip
-                    content={<ChartTooltip />}
+                    content={<ChartTooltip showTotal={false} />}
                     labelFormatter={(_, payload) =>
                       payload?.[0]?.payload?.name
                     }
@@ -700,6 +756,20 @@ function Reports() {
                     stroke={SERIES_COLOR}
                     strokeWidth={2}
                     fill="url(#createdFill)"
+                    dot={false}
+                    activeDot={{
+                      r: 5,
+                      stroke: "#ffffff",
+                      strokeWidth: 2,
+                    }}
+                  />
+
+                  <Area
+                    type="monotone"
+                    dataKey="Closed"
+                    stroke={STATUS_COLORS.Closed}
+                    strokeWidth={2}
+                    fill="url(#closedFill)"
                     dot={false}
                     activeDot={{
                       r: 5,

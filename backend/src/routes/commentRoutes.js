@@ -8,6 +8,12 @@ const {
 } = require("../controllers/commentController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const {
+  validateBody,
+  validateObjectId,
+  rules,
+  required,
+} = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -28,6 +34,7 @@ router.get(
 router.post(
   "/ticket/:ticketId",
   authMiddleware,
+  validateBody({ message: required(rules.comment) }),
   createComment
 );
 
@@ -38,6 +45,8 @@ router.post(
 router.put(
   "/:id",
   authMiddleware,
+  validateObjectId(),
+  validateBody({ message: required(rules.comment) }),
   updateComment
 );
 
@@ -48,6 +57,7 @@ router.put(
 router.delete(
   "/:id",
   authMiddleware,
+  validateObjectId(),
   deleteComment
 );
 

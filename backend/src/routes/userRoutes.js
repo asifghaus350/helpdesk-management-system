@@ -13,6 +13,12 @@ const {
 
 const authMiddleware = require("../middleware/authMiddleware");
 const authorizeRoles = require("../middleware/roleMiddleware");
+const {
+  validateBody,
+  validateObjectId,
+  rules,
+  required,
+} = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -37,6 +43,7 @@ router.get(
   "/:id",
   authMiddleware,
   authorizeRoles("Admin"),
+  validateObjectId(),
   getUserById
 );
 
@@ -49,6 +56,15 @@ router.post(
   "/",
   authMiddleware,
   authorizeRoles("Admin"),
+  validateBody({
+    name: required(rules.name),
+    email: required(rules.email),
+    password: required(rules.password),
+    role: rules.role,
+    status: rules.userStatus,
+    phone: rules.phone,
+    department: rules.department,
+  }),
   createUser
 );
 
@@ -60,6 +76,11 @@ router.post(
 router.put(
   "/profile",
   authMiddleware,
+  validateBody({
+    name: rules.name,
+    email: rules.email,
+    phone: rules.phone,
+  }),
   updateOwnProfile
 );
 
@@ -94,6 +115,17 @@ router.put(
   "/:id",
   authMiddleware,
   authorizeRoles("Admin"),
+  validateObjectId(),
+  validateBody({
+    name: rules.name,
+    email: rules.email,
+    // Blank means "keep the current password"
+    password: { ...rules.password, allowEmpty: true },
+    role: rules.role,
+    status: rules.userStatus,
+    phone: rules.phone,
+    department: rules.department,
+  }),
   updateUser
 );
 
@@ -106,6 +138,7 @@ router.delete(
   "/:id",
   authMiddleware,
   authorizeRoles("Admin"),
+  validateObjectId(),
   deleteUser
 );
 

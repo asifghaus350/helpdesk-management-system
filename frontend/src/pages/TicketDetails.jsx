@@ -11,6 +11,7 @@ import {
   Clock,
   LoaderCircle,
   SearchX,
+  CheckCircle,
 } from "lucide-react";
 
 import Layout from "../components/layout/Layout";
@@ -23,7 +24,7 @@ import {
   canEditTicket,
   canAssignToSelf,
 } from "../utils/auth";
-import { timeAgo, initials } from "../utils/format";
+import { timeAgo, initials, formatDuration } from "../utils/format";
 import { API_URL } from "../config";
 
 // =========================
@@ -327,6 +328,33 @@ function TicketDetails() {
         </span>
       ),
     },
+    ...(ticket.status === "Closed" && ticket.closedAt
+      ? [
+          {
+            label: "Closed",
+            value: (
+              <span
+                className="inline-flex items-center gap-1.5 text-sm text-slate-700"
+                title={formatDateTime(ticket.closedAt)}
+              >
+                <CheckCircle size={14} className="text-emerald-500" />
+                {formatDateTime(ticket.closedAt)}
+              </span>
+            ),
+          },
+          {
+            label: "Resolved in",
+            value: (
+              <span className="text-sm font-semibold text-emerald-600">
+                {formatDuration(
+                  new Date(ticket.closedAt).getTime() -
+                    new Date(ticket.createdAt).getTime()
+                )}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       label: "Updated",
       value: (

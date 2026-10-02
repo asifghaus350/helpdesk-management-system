@@ -32,3 +32,16 @@ export const initials = (name = "") =>
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
     .join("") || "?";
+
+// 45 min · 5.5 h · 2.3 days
+export const formatDuration = (ms) => {
+  if (ms === null || Number.isNaN(ms)) return "—";
+
+  const hours = ms / (60 * 60 * 1000);
+
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`;
+  if (hours < 48) return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} h`;
+
+  const days = hours / 24;
+  return `${days < 10 ? days.toFixed(1) : Math.round(days)} days`;
+};

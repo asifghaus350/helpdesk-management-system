@@ -56,6 +56,13 @@ const ticketSchema = new mongoose.Schema(
       index: true,
     },
 
+    // When the ticket was last closed (null while open).
+    // Used for resolution-time reports.
+    closedAt: {
+      type: Date,
+      default: null,
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -66,6 +73,18 @@ const ticketSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Keep closedAt in step with status on every save
+// (create, admin/engineer updates).
+ticketSchema.pre("save", function trackClosedAt() {
+  if (!this.isNew && !this.isModified("status")) return;
+
+  if (this.status === "Closed") {
+    if (!this.closedAt) this.closedAt = new Date();
+  } else {
+    this.closedAt = null;
+  }
+});
 
 // Indexes for the list, filters and stats
 ticketSchema.index({ createdAt: -1 });

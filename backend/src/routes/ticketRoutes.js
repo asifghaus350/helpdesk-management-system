@@ -11,6 +11,12 @@ const {
 
 const authMiddleware = require("../middleware/authMiddleware");
 const authorizeRoles = require("../middleware/roleMiddleware");
+const {
+  validateBody,
+  validateObjectId,
+  rules,
+  required,
+} = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -21,6 +27,14 @@ const router = express.Router();
 router.post(
   "/",
   authMiddleware,
+  validateBody({
+    title: required(rules.title),
+    description: required(rules.description),
+    category: required(rules.category),
+    priority: rules.priority,
+    status: rules.ticketStatus,
+    engineer: { label: "Engineer", type: "string", max: 100, allowEmpty: true },
+  }),
   createTicket
 );
 
@@ -62,6 +76,15 @@ router.get(
 router.put(
   "/:id",
   authMiddleware,
+  validateBody({
+    title: rules.title,
+    description: rules.description,
+    category: rules.category,
+    priority: rules.priority,
+    status: rules.ticketStatus,
+    engineer: { label: "Engineer", type: "string", max: 100, allowEmpty: true },
+    assignToMe: { label: "assignToMe", type: "boolean" },
+  }),
   updateTicket
 );
 
