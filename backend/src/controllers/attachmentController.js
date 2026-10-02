@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const Attachment = require("../models/Attachment");
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
+const Comment = require("../models/Comment");
 const { checkTicketAccess } = require("../utils/ticketAccess");
 const {
   saveFile,
@@ -37,6 +38,7 @@ const toResponse = (attachment) => ({
   mimeType: attachment.mimeType,
   size: attachment.size,
   uploadedBy: attachment.uploadedBy,
+  comment: attachment.comment || null,
   createdAt: attachment.createdAt,
 });
 
@@ -129,7 +131,9 @@ const getTicketAttachments = async (req, res) => {
 
 // =========================
 // UPLOAD
-// POST /api/attachments/ticket/:ticketId   (multipart, field "files")
+// POST /api/attachments/ticket/:ticketId
+//   multipart: "files" (1-5 files), optional "commentId" to attach
+//   them to one of your own comments on this ticket
 // =========================
 
 const uploadTicketAttachments = async (req, res) => {
@@ -144,6 +148,38 @@ const uploadTicketAttachments = async (req, res) => {
         success: false,
         message: "Please choose at least one file",
       });
+    }
+
+    // Optional: attach to a comment (must be yours, on this ticket)
+    let comment = null;
+    const { commentId } = req.body || {};
+
+    if (commentId) {
+      if (!mongoose.isValidObjectId(commentId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid comment id",
+        });
+      }
+
+      comment = await Comment.findOne({
+        _id: commentId,
+        ticket: ticket._id,
+      });
+
+      if (!comment) {
+        return res.status(404).json({
+          success: false,
+          message: "Comment not found on this ticket",
+        });
+      }
+
+      if (comment.user.toString() !== req.user.id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only attach files to your own comments",
+        });
+      }
     }
 
     const created = [];
@@ -162,6 +198,7 @@ const uploadTicketAttachments = async (req, res) => {
         created.push(
           await Attachment.create({
             ticket: ticket._id,
+            comment: comment ? comment._id : null,
             fileId,
             filename,
             mimeType: file.mimetype,
@@ -180,10 +217,11 @@ const uploadTicketAttachments = async (req, res) => {
       ticket: ticket._id,
       user: req.user.id,
       action: "Attachment Added",
-      message:
+      message: `${
         created.length === 1
           ? `Attached ${created[0].filename}`
-          : `Attached ${created.length} files`,
+          : `Attached ${created.length} files`
+      }${comment ? " to a comment" : ""}`,
       oldValue: "",
       newValue: created.map((item) => item.filename).join(", "),
     });
@@ -312,6 +350,17 @@ const deleteAttachment = async (req, res) => {
   }
 };
 
+// Used when a comment is deleted
+const deleteCommentAttachments = async (commentObjectId) => {
+  const attachments = await Attachment.find({ comment: commentObjectId });
+
+  for (const attachment of attachments) {
+    await deleteFile(attachment.fileId);
+  }
+
+  await Attachment.deleteMany({ comment: commentObjectId });
+};
+
 // Used when a whole ticket is deleted
 const deleteTicketAttachments = async (ticketObjectId) => {
   const attachments = await Attachment.find({ ticket: ticketObjectId });
@@ -329,4 +378,5 @@ module.exports = {
   downloadAttachment,
   deleteAttachment,
   deleteTicketAttachments,
+  deleteCommentAttachments,
 };

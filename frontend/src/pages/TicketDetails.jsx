@@ -495,6 +495,7 @@ function TicketDetails() {
           <TicketAttachments
             ticketId={ticket.ticketId}
             onChange={refreshActivity}
+            refreshKey={activityKey}
           />
 
           {/* CONVERSATION */}

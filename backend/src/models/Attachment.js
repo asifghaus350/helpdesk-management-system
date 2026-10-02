@@ -11,6 +11,14 @@ const attachmentSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Set when the file was attached to a comment (null = the ticket)
+    comment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
+      index: true,
+    },
+
     fileId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,

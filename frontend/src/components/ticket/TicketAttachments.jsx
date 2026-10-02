@@ -34,7 +34,7 @@ const iconFor = (mimeType) => {
   return FileIcon;
 };
 
-function TicketAttachments({ ticketId, onChange }) {
+function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
   const currentUser = getStoredUser();
 
   const [attachments, setAttachments] = useState([]);
@@ -72,7 +72,7 @@ function TicketAttachments({ ticketId, onChange }) {
     return () => {
       cancelled = true;
     };
-  }, [ticketId]);
+  }, [ticketId, refreshKey]);
 
   // =========================
   // IMAGE THUMBNAILS
@@ -313,6 +313,7 @@ function TicketAttachments({ ticketId, onChange }) {
 
                     <p className="text-xs text-slate-500 truncate">
                       {formatBytes(attachment.size)}
+                      {attachment.comment && " · in a comment"}
                       {attachment.uploadedBy?.name &&
                         ` · ${attachment.uploadedBy.name}`}
                       {` · ${timeAgo(attachment.createdAt)}`}

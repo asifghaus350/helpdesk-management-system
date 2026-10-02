@@ -415,7 +415,67 @@ function TicketTable({
 
         ) : (
 
-          <div className="overflow-x-auto">
+          <>
+          {/* PHONES: one card per ticket */}
+
+          <ul className="sm:hidden divide-y divide-slate-100">
+            {currentTickets.map((ticket) => {
+              const statusStyle =
+                statusStyles[ticket.status] || statusStyles.Open;
+
+              const [priorityText, priorityDot] = (
+                priorityStyles[ticket.priority] ||
+                "text-slate-600 bg-slate-400"
+              ).split(" ");
+
+              return (
+                <li key={ticket.ticketId}>
+                  <Link
+                    to={`/tickets/${ticket.ticketId}`}
+                    className="block px-4 py-3.5 active:bg-slate-50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-800 line-clamp-2">
+                        {ticket.title}
+                      </p>
+
+                      <span
+                        className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ring-inset whitespace-nowrap ${statusStyle.pill}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                        {ticket.status}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-500 mt-1">
+                      #{ticket.ticketId} · {ticket.category}
+                    </p>
+
+                    <div className="flex items-center justify-between gap-3 mt-2.5 text-xs">
+                      <span className={`inline-flex items-center gap-1.5 font-medium ${priorityText}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${priorityDot}`} />
+                        {ticket.priority}
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5 text-slate-500 min-w-0">
+                        <span className="truncate">
+                          {ticket.engineer || "Unassigned"}
+                        </span>
+                        <span className="text-slate-300">·</span>
+                        <span className="whitespace-nowrap">
+                          {timeAgo(ticket.updatedAt || ticket.createdAt)}
+                        </span>
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* TABLETS AND UP: full table */}
+
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full min-w-205">
 
               <thead>
@@ -605,6 +665,7 @@ function TicketTable({
 
             </table>
           </div>
+          </>
 
         )}
 

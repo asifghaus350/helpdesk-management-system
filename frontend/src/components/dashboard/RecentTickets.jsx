@@ -18,7 +18,7 @@ function RecentTickets({ tickets = [] }) {
   const getStatusStyle = (status) => {
     switch (status) {
       case "Open":
-        return "bg-red-50 text-red-600 ring-red-100";
+        return "bg-blue-50 text-blue-700 ring-blue-100";
 
       case "In Progress":
         return "bg-amber-50 text-amber-600 ring-amber-100";
@@ -86,10 +86,12 @@ function RecentTickets({ tickets = [] }) {
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50/60">
             {["Ticket", "Status", "Priority", "Updated"].map(
-              (heading) => (
+              (heading, index) => (
                 <th
                   key={heading}
-                  className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  className={`text-left py-3 px-4 sm:px-6 text-xs font-semibold uppercase tracking-wide text-slate-500 ${
+                    index > 1 ? "hidden sm:table-cell" : ""
+                  }`}
                 >
                   {heading}
                 </th>
@@ -115,8 +117,8 @@ function RecentTickets({ tickets = [] }) {
 
                 {/* Ticket */}
 
-                <td className="py-4 px-6">
-                  <p className="text-sm font-semibold text-slate-800 truncate max-w-65">
+                <td className="py-4 px-4 sm:px-6">
+                  <p className="text-sm font-semibold text-slate-800 truncate max-w-48 sm:max-w-65">
                     {ticket.title}
                   </p>
 
@@ -128,7 +130,7 @@ function RecentTickets({ tickets = [] }) {
 
                 {/* Status */}
 
-                <td className="py-4 px-6">
+                <td className="py-4 px-4 sm:px-6">
                   <span
                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ring-1 ring-inset whitespace-nowrap ${getStatusStyle(
                       ticket.status
@@ -140,7 +142,7 @@ function RecentTickets({ tickets = [] }) {
 
                 {/* Priority */}
 
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 hidden sm:table-cell">
                   <span
                     className={`inline-flex items-center gap-2 text-sm font-medium ${priority.text}`}
                   >
@@ -153,7 +155,7 @@ function RecentTickets({ tickets = [] }) {
 
                 {/* Updated */}
 
-                <td className="py-4 px-6 text-sm text-slate-500 whitespace-nowrap">
+                <td className="py-4 px-6 text-sm text-slate-500 whitespace-nowrap hidden sm:table-cell">
                   {timeAgo(ticket.updatedAt || ticket.createdAt)}
                 </td>
 

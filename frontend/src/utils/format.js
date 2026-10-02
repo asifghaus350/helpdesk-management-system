@@ -35,7 +35,7 @@ export const initials = (name = "") =>
 
 // 45 min · 5.5 h · 2.3 days
 export const formatDuration = (ms) => {
-  if (ms === null || Number.isNaN(ms)) return "—";
+  if (ms == null || Number.isNaN(ms)) return "—";
 
   const hours = ms / (60 * 60 * 1000);
 

@@ -106,7 +106,7 @@ function TicketList() {
   ].filter(Boolean).length;
 
   const selectClass = (value) =>
-    `h-11 border rounded-xl px-3.5 pr-9 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer ${
+    `w-full sm:w-auto min-w-0 h-11 border rounded-xl px-3.5 pr-9 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer ${
       value
         ? "border-blue-300 bg-blue-50 text-blue-700 font-medium"
         : "border-slate-200 bg-white text-slate-700"
@@ -176,7 +176,7 @@ function TicketList() {
 
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
 
             <span className="hidden sm:inline-flex items-center gap-1.5 text-sm text-slate-500">
               <SlidersHorizontal size={16} />
@@ -223,7 +223,7 @@ function TicketList() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex items-center gap-1.5 h-11 px-3.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition"
+                className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-1.5 h-11 px-3.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition"
               >
                 <X size={16} />
                 Clear

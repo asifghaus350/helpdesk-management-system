@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import {
   MessageSquare,
   Send,
@@ -7,11 +8,23 @@ import {
   X,
   Check,
   LoaderCircle,
+  Paperclip,
 } from "lucide-react";
 
 import { getStoredUser } from "../../utils/auth";
 import { timeAgo, initials } from "../../utils/format";
 import { API_URL } from "../../config";
+import {
+  ACCEPT,
+  fetchAttachments,
+  uploadAttachments,
+  downloadAttachment,
+  fetchAttachmentBlob,
+  validateFiles,
+  formatBytes,
+  isImage,
+  isPdf,
+} from "../../utils/attachments";
 
 const MAX_LENGTH = 2000;
 
@@ -26,6 +39,13 @@ const sameId = (a, b) =>
 function TicketComments({ ticketId, onChange }) {
   const [comments, setComments] = useState([]);
   const [message, setMessage] = useState("");
+
+  // Files picked in the composer, sent with the next comment
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const fileInputRef = useRef(null);
+
+  // Files already attached to comments, keyed by comment id
+  const [commentFiles, setCommentFiles] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editMessage, setEditMessage] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -111,6 +131,70 @@ function TicketComments({ ticketId, onChange }) {
   }, [ticketId]);
 
   // =========================
+  // FILES ATTACHED TO COMMENTS
+  // =========================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFiles = async () => {
+      try {
+        const attachments = await fetchAttachments(ticketId);
+        const grouped = {};
+
+        attachments
+          .filter((attachment) => attachment.comment)
+          .forEach((attachment) => {
+            const key = String(attachment.comment);
+            grouped[key] = [...(grouped[key] || []), attachment];
+          });
+
+        if (!cancelled) setCommentFiles(grouped);
+      } catch {
+        // Comments still work without their file list
+      }
+    };
+
+    loadFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketId]);
+
+  const addPendingFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+
+    const problem = validateFiles(files, pendingFiles.length);
+
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+
+    setPendingFiles((prev) => [...prev, ...files]);
+  };
+
+  const openCommentFile = async (attachment) => {
+    try {
+      if (isImage(attachment.mimeType) || isPdf(attachment.mimeType)) {
+        const blob = await fetchAttachmentBlob(attachment._id, {
+          inline: true,
+        });
+        const url = URL.createObjectURL(blob);
+
+        window.open(url, "_blank", "noopener");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } else {
+        await downloadAttachment(attachment);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  // =========================
   // ADD COMMENT
   // =========================
 
@@ -184,7 +268,28 @@ function TicketComments({ ticketId, onChange }) {
         }
       }
 
+      // Upload the picked files and link them to the new comment
+      if (pendingFiles.length > 0 && data.comment) {
+        try {
+          const uploaded = await uploadAttachments(
+            ticketId,
+            pendingFiles,
+            data.comment._id
+          );
+
+          setCommentFiles((prev) => ({
+            ...prev,
+            [String(data.comment._id)]: uploaded.attachments || [],
+          }));
+        } catch (uploadError) {
+          toast.error(
+            `Comment posted, but the files were not uploaded: ${uploadError.message}`
+          );
+        }
+      }
+
       setMessage("");
+      setPendingFiles([]);
       onChange?.();
     } catch (error) {
       console.error(
@@ -338,6 +443,13 @@ function TicketComments({ ticketId, onChange }) {
           (comment) => comment._id !== id
         )
       );
+
+      // The server deleted the comment's files too
+      setCommentFiles((prev) => {
+        const next = { ...prev };
+        delete next[String(id)];
+        return next;
+      });
 
       onChange?.();
     } catch (error) {
@@ -602,6 +714,29 @@ function TicketComments({ ticketId, onChange }) {
 
                     )}
 
+                    {/* Files attached to this comment */}
+
+                    {commentFiles[String(comment._id)]?.length > 0 && (
+                      <ul className="flex flex-wrap gap-2 mt-2">
+                        {commentFiles[String(comment._id)].map((attachment) => (
+                          <li key={attachment._id}>
+                            <button
+                              type="button"
+                              onClick={() => openCommentFile(attachment)}
+                              title={`Open ${attachment.filename}`}
+                              className="inline-flex items-center gap-1.5 max-w-60 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-blue-300 hover:text-blue-700 transition"
+                            >
+                              <Paperclip size={13} className="shrink-0 text-slate-400" />
+                              <span className="truncate">{attachment.filename}</span>
+                              <span className="shrink-0 text-slate-400">
+                                {formatBytes(attachment.size)}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
                     {/* Inline delete confirmation */}
 
                     {isConfirmingDelete && (
@@ -663,13 +798,65 @@ function TicketComments({ ticketId, onChange }) {
               className="w-full px-3.5 pt-3 pb-1 text-sm text-slate-800 placeholder-slate-400 bg-transparent outline-none resize-none"
             />
 
+            {pendingFiles.length > 0 && (
+              <ul className="flex flex-wrap gap-2 px-3 pb-2">
+                {pendingFiles.map((file, index) => (
+                  <li
+                    key={`${file.name}-${index}`}
+                    className="inline-flex items-center gap-1.5 max-w-60 rounded-lg bg-slate-100 pl-2.5 pr-1 py-0.5 text-xs text-slate-700"
+                  >
+                    <Paperclip size={12} className="shrink-0 text-slate-400" />
+                    <span className="truncate">{file.name}</span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingFiles((prev) =>
+                          prev.filter((_, i) => i !== index)
+                        )
+                      }
+                      aria-label={`Remove ${file.name}`}
+                      className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                    >
+                      <X size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <div className="flex items-center justify-between gap-3 px-3 pb-2.5">
-              <span className="text-xs text-slate-400">
-                <span className="hidden sm:inline">
-                  Ctrl + Enter to send ·{" "}
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={submitting}
+                  title="Attach files"
+                  aria-label="Attach files"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-50 shrink-0"
+                >
+                  <Paperclip size={16} />
+                </button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ACCEPT}
+                  className="hidden"
+                  onChange={(e) => {
+                    addPendingFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+
+                <span className="text-xs text-slate-400 truncate">
+                  <span className="hidden sm:inline">
+                    Ctrl + Enter to send ·{" "}
+                  </span>
+                  {message.length}/{MAX_LENGTH}
                 </span>
-                {message.length}/{MAX_LENGTH}
-              </span>
+              </div>
 
               <button
                 type="submit"

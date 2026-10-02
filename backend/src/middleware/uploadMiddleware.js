@@ -43,6 +43,34 @@ const fileFilter = (req, file, callback) => {
   return callback(error);
 };
 
+// Binary formats must really start with their file signature, so a
+// script renamed to .png (and sent as image/png) is still rejected.
+const startsWith = (buffer, bytes, offset = 0) =>
+  bytes.every((byte, i) => buffer[offset + i] === byte);
+
+const ascii = (text) => [...text].map((char) => char.charCodeAt(0));
+
+const SIGNATURES = {
+  "image/png": (b) => startsWith(b, [0x89, 0x50, 0x4e, 0x47]),
+  "image/jpeg": (b) => startsWith(b, [0xff, 0xd8, 0xff]),
+  "image/gif": (b) => startsWith(b, ascii("GIF8")),
+  "image/webp": (b) =>
+    startsWith(b, ascii("RIFF")) && startsWith(b, ascii("WEBP"), 8),
+  "application/pdf": (b) => startsWith(b, ascii("%PDF")),
+  // DOCX / XLSX are ZIP files
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    (b) => startsWith(b, [0x50, 0x4b, 0x03, 0x04]),
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+    (b) => startsWith(b, [0x50, 0x4b, 0x03, 0x04]),
+};
+
+// Text formats (txt, log, csv) have no signature; they're served
+// with nosniff and as downloads, so they can't run as a page.
+const contentMatchesType = (file) => {
+  const check = SIGNATURES[file.mimetype];
+  return check ? check(file.buffer || Buffer.alloc(0)) : true;
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -55,7 +83,20 @@ const upload = multer({
 // Turns multer's errors into clear 400 responses
 const uploadAttachments = (req, res, next) => {
   upload.array("files", MAX_FILES)(req, res, (error) => {
-    if (!error) return next();
+    if (!error) {
+      const fake = (req.files || []).find(
+        (file) => !contentMatchesType(file)
+      );
+
+      if (fake) {
+        return res.status(400).json({
+          success: false,
+          message: `"${fake.originalname}" doesn't look like a real ${fake.mimetype.split("/").pop().toUpperCase()} file.`,
+        });
+      }
+
+      return next();
+    }
 
     let message = error.message;
 
@@ -79,4 +120,8 @@ module.exports = {
   uploadAttachments,
   MAX_FILE_SIZE,
   MAX_FILES,
+  // Exported for unit tests
+  fileFilter,
+  ALLOWED,
+  contentMatchesType,
 };

@@ -88,9 +88,12 @@ export const fetchAttachments = async (ticketId) =>
     )
   ).attachments || [];
 
-export const uploadAttachments = async (ticketId, files) => {
+// Pass commentId to attach the files to one of your comments
+export const uploadAttachments = async (ticketId, files, commentId) => {
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
+
+  if (commentId) form.append("commentId", commentId);
 
   // No Content-Type header: the browser sets the multipart boundary
   return readJson(

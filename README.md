@@ -14,7 +14,7 @@ Built with **React 19 + Vite + Tailwind CSS 4** on the frontend and **Node.js + 
 - Status workflow: **Open → In Progress → Closed**
 - Server-side search, filtering (status, priority, category) and pagination
 - Ticket details page with a conversation thread (comments) and a full activity history
-- File attachments (screenshots, PDFs, logs, documents): drag and drop, image previews and downloads. Files are stored in MongoDB GridFS, so they survive server restarts
+- File attachments (screenshots, PDFs, logs, documents) on the ticket itself or on individual comments: drag and drop, image previews and downloads. Files are stored in MongoDB GridFS, so they survive server restarts
 
 ### Roles and access
 
@@ -210,10 +210,12 @@ That account becomes the **Owner**, an Admin who can't be deleted or demoted by 
 | `backend` | `npm run dev` | Start the API with nodemon |
 | `backend` | `npm start` | Start the API with Node |
 | `backend` | `npm run make-owner -- <email>` | Make an existing account the Owner |
+| `backend` | `npm test` | Run the backend unit tests (Node test runner) |
 | `frontend` | `npm run dev` | Start the Vite dev server |
 | `frontend` | `npm run build` | Build the production bundle into `dist/` |
 | `frontend` | `npm run preview` | Preview the production build |
 | `frontend` | `npm run lint` | Run ESLint |
+| `frontend` | `npm test` | Run the frontend unit tests (Vitest) |
 
 ---
 
@@ -279,7 +281,7 @@ Allowed types: PNG, JPG, GIF, WebP, PDF, TXT, LOG, CSV, DOCX and XLSX. Up to 5 f
 | Method | Route | Description |
 |---|---|---|
 | GET | `/ticket/:ticketId` | Files attached to a ticket |
-| POST | `/ticket/:ticketId` | Upload files (`multipart/form-data`, field `files`) |
+| POST | `/ticket/:ticketId` | Upload files (`multipart/form-data`, field `files`; optional `commentId` to attach them to one of your own comments) |
 | GET | `/:id/download` | Download a file (`?inline=1` previews images and PDFs) |
 | DELETE | `/:id` | Delete a file (uploader or Admin) |
 
@@ -331,7 +333,17 @@ The frontend and backend are deployed separately. For example, the backend can g
 
 ---
 
-## Roadmap
+## Testing
 
-- [ ] Attach files directly to individual comments
-- [ ] Automated tests for the API and the UI
+```bash
+cd backend && npm test     # validation, query and upload rules
+cd frontend && npm test    # formatting, file checks and permission helpers
+```
+
+The tests run without a database or a running server, so they are safe to run anywhere, including CI.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).

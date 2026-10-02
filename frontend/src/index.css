@@ -65,9 +65,10 @@
 
 /* Inputs */
 
-.dark input,
-.dark select,
-.dark textarea {
+/* Inputs that sit inside a styled box (bg-transparent) keep it */
+.dark input:not(.bg-transparent),
+.dark select:not(.bg-transparent),
+.dark textarea:not(.bg-transparent) {
   background-color: #334155;
   color: #f8fafc;
   border-color: #475569;
@@ -91,13 +92,8 @@
   background-color: #1e293b;
 }
 
-.dark thead {
-  background-color: #334155;
-}
-
-.dark th {
-  color: #f8fafc !important;
-}
+/* Header rows use their own bg-slate-50 / text-slate-500 classes,
+   which the palette below maps for dark mode. */
 
 .dark td {
   color: #e2e8f0 !important;

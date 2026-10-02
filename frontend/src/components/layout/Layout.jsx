@@ -39,7 +39,6 @@ function Layout({ children }) {
     };
   }, []);
 
-  const isDark = settings.theme === "dark";
 
   // =========================
   // MOBILE SIDEBAR DRAWER
@@ -77,11 +76,7 @@ function Layout({ children }) {
 
   return (
     <div
-      className={`min-h-screen flex ${
-        isDark
-          ? "bg-slate-900 text-white"
-          : "bg-[#f7f8fa] text-slate-800"
-      }`}
+      className="min-h-screen flex bg-[#f7f8fa] dark:bg-slate-900 text-slate-800"
     >
       {/* Sidebar */}
       <Sidebar
@@ -99,11 +94,7 @@ function Layout({ children }) {
 
         {/* Page Content */}
         <main
-          className={`flex-1 min-w-0 transition-all duration-300 ${
-            isDark
-              ? "bg-slate-900 text-white"
-              : "bg-[#f7f8fa] text-slate-800"
-          } ${
+          className={`flex-1 min-w-0 transition-all duration-300 bg-[#f7f8fa] dark:bg-slate-900 text-slate-800 ${
             settings.compactMode
               ? "p-3 sm:p-4"
               : "p-4 sm:p-6 lg:p-8"

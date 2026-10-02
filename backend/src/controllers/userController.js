@@ -10,6 +10,16 @@ const {
   countsByKey,
 } = require("../utils/query");
 
+// Open / in-progress tickets of an engineer who can no longer work
+// on them (deleted, demoted or deactivated) go back to the
+// unassigned queue, so another engineer can pick them up.
+const releaseEngineerTickets = async (engineerId) => {
+  await Ticket.updateMany(
+    { engineerId, status: { $ne: "Closed" } },
+    { engineerId: null, engineer: "" }
+  );
+};
+
 // Tickets store the engineer's display name next to
 // engineerId, so keep it in sync when a name changes.
 const syncEngineerName = async (user) => {
@@ -225,7 +235,7 @@ const getUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .select("-password");
+      .select(SAFE_USER_FIELDS);
 
     if (!user) {
       return res.status(404).json({
@@ -406,6 +416,21 @@ const updateUser = async (req, res) => {
       });
     }
 
+    // Own password goes through Change password (needs the current one)
+    if (
+      password &&
+      user._id.toString() === req.user.id.toString()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Change your own password from Profile → Security.",
+      });
+    }
+
+    const wasActiveEngineer =
+      user.role === "Engineer" && user.status === "Active";
+
     // =========================
     // UPDATE NAME
     // =========================
@@ -489,6 +514,13 @@ const updateUser = async (req, res) => {
 
     await syncEngineerName(user);
 
+    if (
+      wasActiveEngineer &&
+      (user.role !== "Engineer" || user.status !== "Active")
+    ) {
+      await releaseEngineerTickets(user._id);
+    }
+
     // =========================
     // RESPONSE
     // =========================
@@ -556,6 +588,10 @@ const deleteUser = async (req, res) => {
     await User.deleteOne({
       _id: req.params.id,
     });
+
+    if (user.role === "Engineer") {
+      await releaseEngineerTickets(user._id);
+    }
 
     await notify({
       recipients: await adminIds(),
@@ -735,7 +771,7 @@ const updateProfilePhoto = async (req, res) => {
         req.user.id,
         { profilePhoto: "" },
         { new: true }
-      ).select("-password");
+      ).select(SAFE_USER_FIELDS);
 
       if (!user) {
         return res.status(404).json({
@@ -803,7 +839,7 @@ const updateProfilePhoto = async (req, res) => {
       req.user.id,
       { profilePhoto },
       { new: true }
-    ).select("-password");
+    ).select(SAFE_USER_FIELDS);
 
     if (!user) {
       return res.status(404).json({

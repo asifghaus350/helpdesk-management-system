@@ -2,7 +2,8 @@ const Comment = require("../models/Comment");
 const Ticket = require("../models/Ticket");
 const Activity = require("../models/Activity");
 const { checkTicketAccess } = require("../utils/ticketAccess");
-const { notify } = require("../services/notificationService");
+const { notify, adminIds } = require("../services/notificationService");
+const { deleteCommentAttachments } = require("./attachmentController");
 
 // =========================
 // GET TICKET COMMENTS
@@ -123,8 +124,13 @@ const createComment = async (req, res) => {
     // (the commenter is skipped automatically)
     const preview = message.trim();
 
+    // Nobody is assigned yet: let the admins see the reply
+    const commentRecipients = ticket.engineerId
+      ? [ticket.createdBy, ticket.engineerId]
+      : [ticket.createdBy, ...(await adminIds())];
+
     await notify({
-      recipients: [ticket.createdBy, ticket.engineerId],
+      recipients: commentRecipients,
       actor: req.user.id,
       type: "comment_added",
       title: `New comment on ${ticket.ticketId}`,
@@ -183,6 +189,19 @@ const updateComment = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Comment not found",
+      });
+    }
+
+    // Still allowed to see the ticket? (e.g. it was reassigned)
+    const commentTicket = await Ticket.findById(comment.ticket);
+
+    if (
+      !commentTicket ||
+      !(await checkTicketAccess(commentTicket, req.user))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You no longer have access to this ticket",
       });
     }
 
@@ -260,6 +279,19 @@ const deleteComment = async (req, res) => {
       });
     }
 
+    // Still allowed to see the ticket? (e.g. it was reassigned)
+    const commentTicket = await Ticket.findById(comment.ticket);
+
+    if (
+      !commentTicket ||
+      !(await checkTicketAccess(commentTicket, req.user))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You no longer have access to this ticket",
+      });
+    }
+
     // Comment owner OR Admin can delete
     const isOwner =
       comment.user.toString() ===
@@ -293,10 +325,12 @@ const deleteComment = async (req, res) => {
       newValue: "",
     });
 
-    // Delete comment
+    // Delete comment and the files attached to it
     await Comment.deleteOne({
       _id: comment._id,
     });
+
+    await deleteCommentAttachments(comment._id);
 
     res.status(200).json({
       success: true,

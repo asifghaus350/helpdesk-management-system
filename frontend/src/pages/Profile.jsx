@@ -25,6 +25,7 @@ import {
   Bell,
   LayoutGrid,
   ChevronRight,
+  Crown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
@@ -175,6 +176,7 @@ function Profile() {
           department: currentUser.department || "",
           profilePhoto:
             currentUser.profilePhoto || "",
+          isOwner: Boolean(currentUser.isOwner),
         });
 
         setSavedInfo({
@@ -790,7 +792,7 @@ function Profile() {
       label: "Open",
       value: ticketStats.open,
       icon: CircleAlert,
-      tile: "bg-red-50 text-red-600",
+      tile: "bg-blue-50 text-blue-600",
       path: "/tickets?status=Open",
     },
     {
@@ -1018,6 +1020,16 @@ function Profile() {
                     <ShieldCheck size={13} />
                     {roleLabel}
                   </span>
+
+                  {profile.isOwner && (
+                    <span
+                      title="Owner of this HelpDesk"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700"
+                    >
+                      <Crown size={13} />
+                      Owner
+                    </span>
+                  )}
 
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${

@@ -94,13 +94,9 @@ const loginUser = async (req, res) => {
       });
     }
 
-    if (user.status !== "Active") {
-      return res.status(403).json({
-        success: false,
-        message: "Your account is inactive",
-      });
-    }
-
+    // Check the password first, so the response never reveals
+    // whether an account exists or is inactive to someone who
+    // doesn't know the password.
     const isPasswordValid = await bcrypt.compare(
       password,
       user.password
@@ -110,6 +106,13 @@ const loginUser = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
+      });
+    }
+
+    if (user.status !== "Active") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is inactive",
       });
     }
 
@@ -250,7 +253,7 @@ const changePassword = async (req, res) => {
       );
 
     if (!isCurrentPasswordValid) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: "Current password is incorrect",
       });
@@ -388,11 +391,8 @@ try {
 
   await user.save();
 
-  return res.status(500).json({
-    success: false,
-    message:
-      "Unable to send password reset email. Please try again later.",
-  });
+  // Same answer as for unknown emails, so this endpoint can't be
+  // used to find out which accounts exist. The failure is logged.
 }
 
 res.status(200).json({

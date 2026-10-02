@@ -572,6 +572,11 @@ const updateTicket = async (req, res) => {
     const oldEngineer =
       ticket.engineer;
 
+    // Compared by id: two engineers can share a name
+    const oldEngineerId = ticket.engineerId
+      ? ticket.engineerId.toString()
+      : "";
+
     // =========================
     // CHECK BASIC CHANGES
     // =========================
@@ -723,7 +728,12 @@ if (status !== undefined) {
     // ENGINEER ASSIGNMENT ACTIVITY
     // =========================
 
-    if (oldEngineer !== ticket.engineer) {
+    const assignmentChanged =
+      oldEngineerId !==
+        (ticket.engineerId ? ticket.engineerId.toString() : "") ||
+      oldEngineer !== ticket.engineer;
+
+    if (assignmentChanged) {
       await Activity.create({
         ticket: ticket._id,
         user: req.user.id,
@@ -744,8 +754,21 @@ if (status !== undefined) {
 
     const ticketLink = `/tickets/${ticket.ticketId}`;
 
+    if (assignmentChanged && oldEngineerId) {
+      await notify({
+        recipients: [oldEngineerId],
+        actor: req.user.id,
+        type: "ticket_assigned",
+        title: `${ticket.ticketId} is no longer assigned to you`,
+        message: ticket.engineer
+          ? `${ticket.title} · now with ${ticket.engineer}`
+          : ticket.title,
+        link: ticketLink,
+      });
+    }
+
     if (
-      oldEngineer !== ticket.engineer &&
+      assignmentChanged &&
       ticket.engineerId
     ) {
       await notify({

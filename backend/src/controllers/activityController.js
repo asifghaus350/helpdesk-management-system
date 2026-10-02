@@ -59,61 +59,6 @@ const getTicketActivities = async (req, res) => {
   }
 };
 
-// =========================
-// DELETE TICKET ACTIVITIES
-// =========================
-
-const deleteTicketActivities = async (
-  req,
-  res
-) => {
-  try {
-    const { ticketId } = req.params;
-
-    // Only Admin can delete audit history
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Only Admin can delete ticket activities.",
-      });
-    }
-
-    const ticket = await Ticket.findOne({
-      ticketId: ticketId,
-    });
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        message: "Ticket not found",
-      });
-    }
-
-    await Activity.deleteMany({
-      ticket: ticket._id,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message:
-        "Ticket activities deleted successfully",
-    });
-  } catch (error) {
-    console.error(
-      "Delete ticket activities error:",
-      error.message
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Server error while deleting ticket activities",
-    });
-  }
-};
-
 module.exports = {
   getTicketActivities,
-  deleteTicketActivities,
 };

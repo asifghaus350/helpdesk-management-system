@@ -74,86 +74,19 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
   }, []);
 
   // =========================
-  // THEME
-  // =========================
-
-  const [theme, setTheme] = useState(() => {
-    try {
-      const savedSettings =
-        localStorage.getItem("settings");
-
-      if (savedSettings) {
-        const parsedSettings =
-          JSON.parse(savedSettings);
-
-        return parsedSettings.theme || "light";
-      }
-
-      return "light";
-    } catch (error) {
-      console.error(
-        "Invalid settings data:",
-        error
-      );
-
-      return "light";
-    }
-  });
-
-  // =========================
-  // SETTINGS + USER CHANGE
+  // USER CHANGE
   // =========================
 
   useEffect(() => {
-    const handleSettingsChange = () => {
-      try {
-        const savedSettings =
-          localStorage.getItem("settings");
-
-        if (savedSettings) {
-          const parsedSettings =
-            JSON.parse(savedSettings);
-
-          setTheme(
-            parsedSettings.theme || "light"
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Settings update error:",
-          error
-        );
-      }
-    };
-
     const handleUserChange = () => {
       setUser(getStoredUser());
     };
 
-    window.addEventListener(
-      "settingsChanged",
-      handleSettingsChange
-    );
+    window.addEventListener("userChanged", handleUserChange);
 
-    window.addEventListener(
-      "userChanged",
-      handleUserChange
-    );
-
-    return () => {
-      window.removeEventListener(
-        "settingsChanged",
-        handleSettingsChange
-      );
-
-      window.removeEventListener(
-        "userChanged",
-        handleUserChange
-      );
-    };
+    return () =>
+      window.removeEventListener("userChanged", handleUserChange);
   }, []);
-
-  const isDark = theme === "dark";
 
   // =========================
   // USER DISPLAY DATA
@@ -164,11 +97,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
 
   return (
     <header
-      className={`sticky top-0 z-30 border-b transition-colors ${
-        isDark
-          ? "bg-slate-900 border-slate-700"
-          : "bg-white border-slate-200"
-      }`}
+      className={`sticky top-0 z-30 border-b transition-colors bg-white border-slate-200`}
     >
     <div className="h-16 lg:h-21.5 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
 
@@ -182,11 +111,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
         aria-label="Open menu"
         aria-controls="app-sidebar"
         aria-expanded={isMenuOpen}
-        className={`lg:hidden w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition ${
-          isDark
-            ? "text-slate-300 hover:bg-slate-800"
-            : "text-slate-600 hover:bg-slate-100"
-        }`}
+        className={`lg:hidden w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition text-slate-600 hover:bg-slate-100`}
       >
         <Menu size={22} />
       </button>
@@ -197,21 +122,13 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
 
       <div className="min-w-0 flex-1">
         <h1
-          className={`text-lg sm:text-xl lg:text-2xl font-bold tracking-tight truncate ${
-            isDark
-              ? "text-white"
-              : "text-slate-800"
-          }`}
+          className={`text-lg sm:text-xl lg:text-2xl font-bold tracking-tight truncate text-slate-800`}
         >
           {pageTitle}
         </h1>
 
         <p
-          className={`hidden sm:block text-sm mt-1 truncate ${
-            isDark
-              ? "text-slate-400"
-              : "text-slate-500"
-          }`}
+          className={`hidden sm:block text-sm mt-1 truncate text-slate-500`}
         >
           Welcome back, {userName} 👋
         </p>
@@ -234,11 +151,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
         >
           <Search
             size={18}
-            className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-              isDark
-                ? "text-slate-400"
-                : "text-slate-400"
-            }`}
+            className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-400`}
           />
 
           <input
@@ -247,11 +160,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
             onChange={(e) => setSearchText(e.target.value)}
             placeholder="Search tickets..."
             aria-label="Search tickets"
-            className={`w-56 lg:w-72 xl:w-80 h-11 lg:h-12 pl-11 pr-4 rounded-xl border outline-none transition ${
-              isDark
-                ? "bg-slate-800 border-slate-700 text-white placeholder:text-slate-400 focus:border-blue-500"
-                : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-400"
-            }`}
+            className={`w-56 lg:w-72 xl:w-80 h-11 lg:h-12 pl-11 pr-4 rounded-xl border outline-none transition bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-400`}
           />
         </form>
 
@@ -262,11 +171,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
           onClick={() => setMobileSearchOpen((open) => !open)}
           aria-label={mobileSearchOpen ? "Close search" : "Search tickets"}
           aria-expanded={mobileSearchOpen}
-          className={`md:hidden w-10 h-10 rounded-xl flex items-center justify-center transition ${
-            isDark
-              ? "text-slate-300 hover:bg-slate-800"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
+          className={`md:hidden w-10 h-10 rounded-xl flex items-center justify-center transition text-slate-600 hover:bg-slate-100`}
         >
           {mobileSearchOpen ? <X size={20} /> : <Search size={20} />}
         </button>
@@ -276,11 +181,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
         ========================= */}
 
         <div
-          className={`w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center transition ${
-            isDark
-              ? "hover:bg-slate-800"
-              : "hover:bg-slate-100"
-          }`}
+          className={`w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center transition hover:bg-slate-100`}
         >
           <NotificationDropdown />
         </div>
@@ -293,11 +194,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
           type="button"
           onClick={() => navigate("/settings")}
           aria-label="Settings"
-          className={`hidden sm:flex w-10 h-10 lg:w-11 lg:h-11 rounded-xl items-center justify-center transition ${
-            isDark
-              ? "text-slate-300 hover:bg-slate-800 hover:text-white"
-              : "text-slate-600 hover:bg-slate-100 hover:text-blue-600"
-          }`}
+          className={`hidden sm:flex w-10 h-10 lg:w-11 lg:h-11 rounded-xl items-center justify-center transition text-slate-600 hover:bg-slate-100 hover:text-blue-600`}
         >
           <Settings size={21} />
         </button>
@@ -310,11 +207,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
           type="button"
           onClick={() => navigate("/profile")}
           aria-label="Open profile"
-          className={`flex items-center gap-3 p-1 sm:pl-3 sm:pr-2 sm:py-2 rounded-xl transition ${
-            isDark
-              ? "hover:bg-slate-800"
-              : "hover:bg-slate-50"
-          }`}
+          className={`flex items-center gap-3 p-1 sm:pl-3 sm:pr-2 sm:py-2 rounded-xl transition hover:bg-slate-50`}
         >
           {user?.profilePhoto ? (
   <img
@@ -332,21 +225,13 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
 
           <div className="hidden lg:block text-left">
             <p
-              className={`font-semibold text-sm ${
-                isDark
-                  ? "text-white"
-                  : "text-slate-800"
-              }`}
+              className={`font-semibold text-sm text-slate-800`}
             >
               {userName}
             </p>
 
             <p
-              className={`text-xs mt-0.5 ${
-                isDark
-                  ? "text-slate-400"
-                  : "text-slate-500"
-              }`}
+              className={`text-xs mt-0.5 text-slate-500`}
             >
               {userRole}
             </p>
@@ -379,11 +264,7 @@ function Navbar({ isMenuOpen = false, onMenuClick = () => {} }) {
               placeholder="Search tickets..."
               aria-label="Search tickets"
               autoFocus
-              className={`w-full h-11 pl-10 pr-4 rounded-xl border outline-none transition ${
-                isDark
-                  ? "bg-slate-800 border-slate-700 text-white placeholder:text-slate-400 focus:border-blue-500"
-                  : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-400"
-              }`}
+              className={`w-full h-11 pl-10 pr-4 rounded-xl border outline-none transition bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-400`}
             />
           </div>
         </form>

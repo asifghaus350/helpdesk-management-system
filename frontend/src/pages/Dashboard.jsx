@@ -184,9 +184,9 @@ function Dashboard() {
     {
       title: "Open Tickets",
       count: openTickets,
-      color: "bg-red-50",
-      iconColor: "text-red-600",
-      barColor: "bg-red-500",
+      color: "bg-blue-50",
+      iconColor: "text-blue-600",
+      barColor: "bg-blue-500",
       percent: percentOf(openTickets),
       hint: `${percentOf(openTickets)}% awaiting action`,
       icon: CircleAlert,
@@ -217,7 +217,7 @@ function Dashboard() {
   ];
 
   const distribution = [
-    { name: "Open", value: openTickets, color: "#ef4444" },
+    { name: "Open", value: openTickets, color: "#3b82f6" },
     { name: "In Progress", value: inProgressTickets, color: "#f59e0b" },
     { name: "Closed", value: closedTickets, color: "#10b981" },
   ];
@@ -261,7 +261,7 @@ function Dashboard() {
         <div className="animate-pulse space-y-6">
           <div className="h-40 rounded-2xl bg-slate-200" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5">
             {[1, 2, 3, 4].map((item) => (
               <div
                 key={item}
@@ -360,7 +360,7 @@ function Dashboard() {
           STATISTICS CARDS
       ========================= */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5">
         {cards.map(({ filter, ...card }) => (
           <DashboardCard
             key={card.title}
@@ -402,7 +402,7 @@ function Dashboard() {
             <button
               type="button"
               onClick={() => navigate("/tickets")}
-              className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
+              className="flex items-center gap-1 shrink-0 whitespace-nowrap text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
             >
               View all
               <ArrowUpRight size={16} />
