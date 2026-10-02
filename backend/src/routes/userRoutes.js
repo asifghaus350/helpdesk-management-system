@@ -9,6 +9,7 @@ const {
   updateOwnProfile,
   updateProfilePhoto,
   updatePreferences,
+  transferOwnership,
 } = require("../controllers/userController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -104,6 +105,19 @@ router.put(
   "/profile/preferences",
   authMiddleware,
   updatePreferences
+);
+
+// =========================
+// TRANSFER OWNERSHIP
+// OWNER ONLY (checked in the controller)
+// =========================
+
+router.post(
+  "/:id/transfer-ownership",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  validateObjectId(),
+  transferOwnership
 );
 
 // =========================

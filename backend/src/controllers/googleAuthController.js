@@ -124,6 +124,7 @@ const googleLogin = async (req, res) => {
         phone: user.phone || "",
         department: user.department || "",
         profilePhoto: user.profilePhoto || "",
+        isOwner: Boolean(user.isOwner),
         preferences: user.preferences,
       },
     });

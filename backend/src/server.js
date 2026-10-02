@@ -17,6 +17,7 @@ const attachmentRoutes = require("./routes/attachmentRoutes");
 const connectDB = require("./config/db");
 const backfillEngineerIds = require("./utils/backfillEngineerIds");
 const backfillClosedAt = require("./utils/backfillClosedAt");
+const ensureOwner = require("./utils/ensureOwner");
 
 const app = express();
 
@@ -172,6 +173,7 @@ const startServer = async () => {
   await connectDB();
   await backfillEngineerIds();
   await backfillClosedAt();
+  await ensureOwner();
 
   app.listen(PORT, () => {
     console.log(

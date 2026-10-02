@@ -20,7 +20,8 @@ Built with **React 19 + Vite + Tailwind CSS 4** on the frontend and **Node.js + 
 
 | Role | What they can do |
 |---|---|
-| **Admin** | See and manage every ticket, assign engineers, change status, delete tickets, manage users, view reports |
+| **Owner** | One protected Admin account. Everything an Admin can do, plus creating, editing and removing Admins and transferring ownership. Nobody can delete or demote the Owner |
+| **Admin** | See and manage every ticket, assign engineers, change status, delete tickets, manage Engineers and Users, view reports |
 | **Engineer** | Work on tickets assigned to them, pick up unassigned tickets with **Assign to me**, update status |
 | **User** | Raise tickets, follow and comment on their own tickets |
 
@@ -62,6 +63,7 @@ Access rules are enforced on the backend. The UI only shows the actions a role i
 - Passwords hashed with bcrypt; JWT authentication
 - Request validation on every write route (types, email and phone format, lengths, allowed values), so bad input gets a clear `400`
 - The role and status of each request are re-checked against the database, so a deactivated or demoted user loses access immediately
+- Role hierarchy: only the Owner can create, edit or remove Admins, and the Owner account can't be deleted or demoted
 - Changing or resetting a password signs out every other session
 - Google sign-in only accepts email addresses Google has verified
 - The activity history is written by the server only and can't be edited through the API
@@ -182,14 +184,22 @@ Open `http://localhost:5173`.
 
 > If the Firebase variables are left empty, the app still works. Only the **Continue with Google** button is disabled.
 
-### 4. Create the first admin
+### 4. Create the Owner (first admin)
 
-Public registration always creates a **User** account, so the first **Admin** has to be set up by hand:
+Public registration always creates a **User** account. To make the first Admin:
 
-1. Create an account with `POST /api/auth/register`, for example from Postman.
-2. In MongoDB, change that user's `role` to `"Admin"`.
+1. Sign in once with **Continue with Google**, or create an account with `POST /api/auth/register`.
+2. From the `backend` folder, run:
 
-From then on, the admin can create every other user from the **Users** page.
+   ```bash
+   npm run make-owner -- you@example.com
+   ```
+
+3. Log out and log back in.
+
+That account becomes the **Owner**, an Admin who can't be deleted or demoted by other Admins. The Owner can then create every other user from the **Users** page. The same command also recovers access if the Owner account is ever lost.
+
+> If no Owner exists when the server starts, the oldest active Admin is made the Owner automatically.
 
 ---
 
@@ -199,6 +209,7 @@ From then on, the admin can create every other user from the **Users** page.
 |---|---|---|
 | `backend` | `npm run dev` | Start the API with nodemon |
 | `backend` | `npm start` | Start the API with Node |
+| `backend` | `npm run make-owner -- <email>` | Make an existing account the Owner |
 | `frontend` | `npm run dev` | Start the Vite dev server |
 | `frontend` | `npm run build` | Build the production bundle into `dist/` |
 | `frontend` | `npm run preview` | Preview the production build |
@@ -287,6 +298,7 @@ Allowed types: PNG, JPG, GIF, WebP, PDF, TXT, LOG, CSV, DOCX and XLSX. Up to 5 f
 | PUT | `/profile` | Update own name, email and phone |
 | PUT | `/profile/photo` | Upload or remove own profile photo |
 | PUT | `/profile/preferences` | Save own theme and notification settings |
+| POST | `/:id/transfer-ownership` | Make another active Admin the Owner (Owner only) |
 
 </details>
 

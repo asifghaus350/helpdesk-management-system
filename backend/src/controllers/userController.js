@@ -31,24 +31,51 @@ const syncEngineerName = async (user) => {
 const isActiveAdmin = (user) =>
   user.role === "Admin" && user.status === "Active";
 
+// Role hierarchy:
+//   Owner  -> can manage everyone (except deleting/demoting themselves)
+//   Admin  -> can manage Engineers and Users, not other Admins
+// Returns { status, message } when the change isn't allowed, else null.
 const adminChangeProblem = async ({
   target,
-  actorId,
+  actor,
   nextRole = target.role,
   nextStatus = target.status,
   deleting = false,
 }) => {
-  const isSelf = target._id.toString() === actorId.toString();
+  const isSelf = target._id.toString() === actor._id.toString();
+  const actorIsOwner = Boolean(actor.isOwner);
+
+  const forbidden = (message) => ({ status: 403, message });
 
   if (isSelf && deleting) {
-    return "You can't delete your own account.";
+    return forbidden(
+      target.isOwner
+        ? "The Owner account can't be deleted. Transfer ownership to another Admin first."
+        : "You can't delete your own account."
+    );
   }
 
   if (
     isSelf &&
     (nextRole !== target.role || nextStatus !== target.status)
   ) {
-    return "You can't change your own role or status. Ask another admin to do it.";
+    return forbidden(
+      target.isOwner
+        ? "The Owner must stay an active Admin. Transfer ownership first if you want to step down."
+        : "You can't change your own role or status. Ask the Owner to do it."
+    );
+  }
+
+  if (target.isOwner && !isSelf) {
+    return forbidden("Only the Owner can change the Owner account.");
+  }
+
+  if (target.role === "Admin" && !isSelf && !actorIsOwner) {
+    return forbidden("Only the Owner can edit or remove other Admins.");
+  }
+
+  if (nextRole === "Admin" && target.role !== "Admin" && !actorIsOwner) {
+    return forbidden("Only the Owner can make someone an Admin.");
   }
 
   const losesAdmin =
@@ -63,12 +90,20 @@ const adminChangeProblem = async ({
     });
 
     if (otherActiveAdmins === 0) {
-      return "This is the only active Admin. Make another user an active Admin first.";
+      return {
+        status: 400,
+        message:
+          "This is the only active Admin. Make another user an active Admin first.",
+      };
     }
   }
 
-  return "";
+  return null;
 };
+
+// The logged-in admin, with isOwner
+const loadActor = (req) =>
+  User.findById(req.user.id).select("isOwner role");
 
 // =========================
 // GET ALL USERS
@@ -238,6 +273,13 @@ const createUser = async (req, res) => {
       });
     }
 
+    if (role === "Admin" && !req.user.isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the Owner can create Admin accounts.",
+      });
+    }
+
     // Check existing email
     const existingUser = await User.findOne({
       email: email.toLowerCase(),
@@ -352,15 +394,15 @@ const updateUser = async (req, res) => {
 
     const problem = await adminChangeProblem({
       target: user,
-      actorId: req.user.id,
+      actor: await loadActor(req),
       nextRole: role ?? user.role,
       nextStatus: status ?? user.status,
     });
 
     if (problem) {
-      return res.status(400).json({
+      return res.status(problem.status).json({
         success: false,
-        message: problem,
+        message: problem.message,
       });
     }
 
@@ -500,14 +542,14 @@ const deleteUser = async (req, res) => {
 
     const problem = await adminChangeProblem({
       target: user,
-      actorId: req.user.id,
+      actor: await loadActor(req),
       deleting: true,
     });
 
     if (problem) {
-      return res.status(400).json({
+      return res.status(problem.status).json({
         success: false,
-        message: problem,
+        message: problem.message,
       });
     }
 
@@ -852,7 +894,76 @@ const updatePreferences = async (req, res) => {
   }
 };
 
+// =========================
+// TRANSFER OWNERSHIP
+// OWNER ONLY
+// =========================
+// POST /api/users/:id/transfer-ownership
+// The target must be another active Admin. The current Owner stays
+// an Admin but is no longer the Owner.
+
+const transferOwnership = async (req, res) => {
+  try {
+    if (!req.user.isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the Owner can transfer ownership.",
+      });
+    }
+
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: "You are already the Owner.",
+      });
+    }
+
+    const target = await User.findById(req.params.id);
+
+    if (!target) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (target.role !== "Admin" || target.status !== "Active") {
+      return res.status(400).json({
+        success: false,
+        message: "Ownership can only be given to an active Admin.",
+      });
+    }
+
+    // New owner first, so there is never a moment with no Owner
+    await User.updateOne({ _id: target._id }, { isOwner: true });
+    await User.updateOne({ _id: req.user.id }, { isOwner: false });
+
+    await notify({
+      recipients: [target._id],
+      actor: req.user.id,
+      type: "user_created",
+      title: "You are now the Owner of this HelpDesk",
+      message: "You can now manage Admins and transfer ownership.",
+      link: "/users",
+      email: true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `${target.name} is now the Owner.`,
+    });
+  } catch (error) {
+    console.error("Transfer ownership error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while transferring ownership",
+    });
+  }
+};
+
 module.exports = {
+  transferOwnership,
   updatePreferences,
   getUsers,
   getUserById,

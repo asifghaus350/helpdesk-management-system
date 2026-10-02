@@ -76,6 +76,14 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    // The account that owns this HelpDesk. Exactly one user has it.
+    // Only the Owner can create, change or remove Admins, and nobody
+    // can delete or demote the Owner (ownership can be transferred).
+    isOwner: {
+      type: Boolean,
+      default: false,
+    },
+
     // Set whenever the password changes. Login tokens issued
     // before this moment stop working (see authMiddleware).
     passwordChangedAt: {

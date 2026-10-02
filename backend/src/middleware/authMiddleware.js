@@ -42,7 +42,7 @@ const authMiddleware = async (req, res, next) => {
     // deactivated or re-roled users take effect at once
     // instead of when their token expires.
     const user = await User.findById(decoded.id).select(
-      "role status passwordChangedAt"
+      "role status passwordChangedAt isOwner"
     );
 
     if (!user || user.status !== "Active") {
@@ -72,6 +72,7 @@ const authMiddleware = async (req, res, next) => {
       ...decoded,
       id: user._id.toString(),
       role: user.role,
+      isOwner: Boolean(user.isOwner),
     };
 
     next();

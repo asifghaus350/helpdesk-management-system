@@ -130,6 +130,7 @@ const loginUser = async (req, res) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      isOwner: Boolean(user.isOwner),
       preferences: user.preferences,
     };
 
@@ -176,6 +177,7 @@ const getMe = async (req, res) => {
         phone: user.phone,
         department: user.department,
         profilePhoto: user.profilePhoto,
+        isOwner: Boolean(user.isOwner),
         preferences: user.preferences,
       },
     });

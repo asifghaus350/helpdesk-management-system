@@ -25,13 +25,14 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  Crown,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
 
 import Layout from "../components/layout/Layout";
 
-import { getStoredUser } from "../utils/auth";
+import { getStoredUser, refreshStoredUser } from "../utils/auth";
 import { initials } from "../utils/format";
 import useDebouncedValue from "../utils/useDebouncedValue";
 import toast from "react-hot-toast";
@@ -90,6 +91,8 @@ function UserManagement() {
 
   const [submitting, setSubmitting] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [ownerCandidate, setOwnerCandidate] = useState(null);
+  const [transferring, setTransferring] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const currentUser = getStoredUser();
@@ -638,6 +641,66 @@ function UserManagement() {
   // Editing your own account: role and status are locked
   const editingSelf = Boolean(editingUser && isSelf(editingUser));
 
+  // =========================
+  // ROLE HIERARCHY (same rules as the backend)
+  // =========================
+  // Owner: manages everyone. Admin: manages Engineers and Users only.
+
+  const iAmOwner = Boolean(currentUser?.isOwner);
+
+  const manageBlockReason = (user) => {
+    if (isSelf(user)) return "";
+    if (user.isOwner) return "Only the Owner can change the Owner account";
+    if (user.role === "Admin" && !iAmOwner) {
+      return "Only the Owner can edit or remove other Admins";
+    }
+    return "";
+  };
+
+  const canEditUser = (user) => !manageBlockReason(user);
+
+  const canDeleteUser = (user) =>
+    !isSelf(user) && !manageBlockReason(user);
+
+  const canMakeOwner = (user) =>
+    iAmOwner &&
+    !isSelf(user) &&
+    user.role === "Admin" &&
+    user.status === "Active";
+
+  const confirmTransfer = async () => {
+    try {
+      setTransferring(true);
+
+      const response = await fetch(
+        `${API_URL}/api/users/${ownerCandidate._id}/transfer-ownership`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Could not transfer ownership");
+      }
+
+      toast.success(data.message);
+      setOwnerCandidate(null);
+
+      // My own isOwner flag just changed
+      await refreshStoredUser();
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   // Submit guard so a double click can't create two users
   const submitUser = async (e) => {
     if (submitting) {
@@ -965,6 +1028,16 @@ function UserManagement() {
                                 {user.name}
                               </span>
 
+                              {user.isOwner && (
+                                <span
+                                  title="Owner of this HelpDesk"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase"
+                                >
+                                  <Crown size={11} />
+                                  Owner
+                                </span>
+                              )}
+
                               {isSelf(user) && (
                                 <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 text-[10px] font-bold uppercase">
                                   You
@@ -1038,12 +1111,25 @@ function UserManagement() {
 
                       <td className="px-5 py-3.5">
                         <div className="flex justify-end gap-1">
+                          {canMakeOwner(user) && (
+                            <button
+                              type="button"
+                              onClick={() => setOwnerCandidate(user)}
+                              title="Make Owner"
+                              aria-label={`Make ${user.name} the Owner`}
+                              className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition"
+                            >
+                              <Crown size={17} />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => openEditModal(user)}
-                            title="Edit user"
+                            disabled={!canEditUser(user)}
+                            title={manageBlockReason(user) || "Edit user"}
                             aria-label={`Edit ${user.name}`}
-                            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition"
+                            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500 transition"
                           >
                             <Pencil size={17} />
                           </button>
@@ -1051,11 +1137,13 @@ function UserManagement() {
                           <button
                             type="button"
                             onClick={() => setUserToDelete(user)}
-                            disabled={isSelf(user)}
+                            disabled={!canDeleteUser(user)}
                             title={
                               isSelf(user)
-                                ? "You can't delete your own account"
-                                : "Delete user"
+                                ? user.isOwner
+                                  ? "The Owner can't be deleted. Transfer ownership first"
+                                  : "You can't delete your own account"
+                                : manageBlockReason(user) || "Delete user"
                             }
                             aria-label={`Delete ${user.name}`}
                             className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500 transition"
@@ -1366,7 +1454,15 @@ function UserManagement() {
                           type="button"
                           role="radio"
                           aria-checked={isSelected}
-                          disabled={editingSelf}
+                          disabled={
+                            editingSelf ||
+                            (value === "Admin" && !iAmOwner)
+                          }
+                          title={
+                            value === "Admin" && !iAmOwner
+                              ? "Only the Owner can make someone an Admin"
+                              : undefined
+                          }
                           onClick={() =>
                             handleChange({
                               target: { name: "role", value },
@@ -1538,6 +1634,70 @@ function UserManagement() {
                   <LoaderCircle size={17} className="animate-spin" />
                 )}
                 {deleting ? "Deleting..." : "Delete User"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================
+          TRANSFER OWNERSHIP
+      ========================= */}
+
+      {ownerCandidate && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => !transferring && setOwnerCandidate(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="transfer-owner-title"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+          >
+            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Crown size={22} />
+            </div>
+
+            <h2
+              id="transfer-owner-title"
+              className="text-lg font-bold text-slate-800 mt-4"
+            >
+              Make {ownerCandidate.name} the Owner?
+            </h2>
+
+            <ul className="text-sm text-slate-500 mt-3 space-y-1.5 list-disc pl-5">
+              <li>
+                <span className="font-medium text-slate-700">
+                  {ownerCandidate.name}
+                </span>{" "}
+                will be able to manage every Admin, including you.
+              </li>
+              <li>You stay an Admin, but you lose Owner rights.</li>
+              <li>Only the new Owner can give ownership back.</li>
+            </ul>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setOwnerCandidate(null)}
+                disabled={transferring}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmTransfer}
+                disabled={transferring}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-60"
+              >
+                {transferring && (
+                  <LoaderCircle size={17} className="animate-spin" />
+                )}
+                {transferring ? "Transferring..." : "Transfer ownership"}
               </button>
             </div>
           </div>
