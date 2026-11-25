@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Ticket = require("../models/Ticket");
 const { notify, adminIds } = require("../services/notificationService");
+const { requestEmailChange } = require("./authController");
 const {
   parsePagination,
   buildPagination,
@@ -634,7 +635,7 @@ const updateOwnProfile = async (req, res) => {
       name,
       email,
       phone,
-    } = req.body;
+    } = req.body || {};
 
     const user = await User.findById(
       req.user.id
@@ -663,8 +664,13 @@ const updateOwnProfile = async (req, res) => {
     }
 
     // =========================
-    // UPDATE EMAIL
+    // EMAIL CHANGE (checked first)
     // =========================
+    // Needs the current password, and the new address only
+    // replaces the old one once the link sent to it is opened.
+    // Otherwise anyone could claim an email that isn't theirs.
+
+    let newEmail = "";
 
     if (email !== undefined) {
       const normalizedEmail =
@@ -677,21 +683,55 @@ const updateOwnProfile = async (req, res) => {
         });
       }
 
-      const existingUser =
-        await User.findOne({
-          email: normalizedEmail,
-          _id: { $ne: user._id },
-        });
+      if (normalizedEmail !== user.email) {
+        const { currentPassword } = req.body || {};
 
-      if (existingUser) {
+        const passwordOk =
+          typeof currentPassword === "string" &&
+          currentPassword.length > 0 &&
+          (await bcrypt.compare(currentPassword, user.password));
+
+        if (!passwordOk) {
+          return res.status(400).json({
+            success: false,
+            field: "currentPassword",
+            message: currentPassword
+              ? "Current password is incorrect."
+              : "Enter your current password to change your email.",
+          });
+        }
+
+        const existingUser =
+          await User.findOne({
+            email: normalizedEmail,
+            _id: { $ne: user._id },
+          });
+
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Another user already uses this email.",
+          });
+        }
+
+        newEmail = normalizedEmail;
+      }
+    }
+
+    // =========================
+    // UPDATE NAME
+    // =========================
+
+    if (name !== undefined) {
+      if (!name.trim()) {
         return res.status(400).json({
           success: false,
-          message:
-            "Another user already uses this email.",
+          message: "Name cannot be empty.",
         });
       }
 
-      user.email = normalizedEmail;
+      user.name = name.trim();
     }
 
     // =========================
@@ -710,6 +750,27 @@ const updateOwnProfile = async (req, res) => {
 
     await syncEngineerName(user);
 
+    let message = "Profile updated successfully.";
+
+    if (newEmail) {
+      try {
+        await requestEmailChange(user, newEmail);
+
+        message = `We sent a confirmation link to ${newEmail}. Your email changes after you open it.`;
+      } catch (emailError) {
+        console.error(
+          "Email change email error:",
+          emailError.message
+        );
+
+        return res.status(502).json({
+          success: false,
+          message:
+            "Your other changes were saved, but we couldn't send the confirmation email to the new address. Please try again later.",
+        });
+      }
+    }
+
     // =========================
     // RESPONSE
     // =========================
@@ -725,11 +786,13 @@ const updateOwnProfile = async (req, res) => {
       profilePhoto: user.profilePhoto,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      pendingEmail: newEmail ? user.pendingEmail : "",
     };
 
     res.status(200).json({
       success: true,
-      message: "Profile updated successfully.",
+      message,
+      emailChangePending: Boolean(newEmail),
       user: userResponse,
     });
   } catch (error) {

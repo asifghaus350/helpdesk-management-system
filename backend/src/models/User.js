@@ -101,6 +101,43 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Self-signup accounts start unverified and can't log in until
+    // the link sent to their email is opened. Defaults to true so
+    // existing, admin-created and Google accounts count as verified.
+    emailVerified: {
+      type: Boolean,
+      default: true,
+    },
+
+    emailVerificationToken: {
+      type: String,
+      default: null,
+    },
+
+    emailVerificationExpires: {
+      type: Date,
+      default: null,
+    },
+
+    // Own-profile email change: the new address only replaces the
+    // current one after the link sent to it is opened.
+    pendingEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: "",
+    },
+
+    emailChangeToken: {
+      type: String,
+      default: null,
+    },
+
+    emailChangeExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

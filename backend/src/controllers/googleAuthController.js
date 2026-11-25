@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 const admin = require("../config/firebaseAdmin");
@@ -77,6 +78,23 @@ const googleLogin = async (req, res) => {
         role: "User",
         status: "Active",
       });
+    } else if (user.emailVerified === false) {
+      // Someone signed up with this email but never verified it.
+      // Google has just proved who owns the inbox, so they get the
+      // account and the unverified sign-up's password stops working.
+      user.password = await bcrypt.hash(
+        crypto.randomBytes(32).toString("hex"),
+        10
+      );
+      user.emailVerified = true;
+      user.emailVerificationToken = null;
+      user.emailVerificationExpires = null;
+
+      if (name) {
+        user.name = name;
+      }
+
+      await user.save();
     }
 
     // Use the Google profile picture when the user hasn't uploaded

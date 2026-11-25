@@ -42,7 +42,39 @@ const passwordResetLimiter = rateLimit({
   ),
 });
 
+// =========================
+// SELF SIGN-UP
+// =========================
+// Every sign-up sends an email and creates an account, so count
+// all of them (successful ones too): 5 per IP per hour.
+
+const registerLimiter = rateLimit({
+  windowMs: 4 * FIFTEEN_MINUTES,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: limitHandler(
+    "Too many sign-ups from this network. Please wait an hour and try again."
+  ),
+});
+
+// =========================
+// VERIFICATION / EMAIL-CHANGE EMAILS
+// =========================
+
+const emailLinkLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: limitHandler(
+    "Too many email requests. Please wait 15 minutes and try again."
+  ),
+});
+
 module.exports = {
   authLimiter,
   passwordResetLimiter,
+  registerLimiter,
+  emailLinkLimiter,
 };

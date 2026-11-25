@@ -25,6 +25,7 @@ import {
   isTokenExpired,
 } from "../utils/auth";
 import AuthLayout from "../components/auth/AuthLayout";
+import CheckEmailNotice from "../components/auth/CheckEmailNotice";
 import { API_URL } from "../config";
 
 function Login() {
@@ -35,6 +36,7 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
 const [loading, setLoading] = useState(false);
 const [googleLoading, setGoogleLoading] = useState(false);
+const [unverifiedEmail, setUnverifiedEmail] = useState("");
 const [searchParams] = useSearchParams();
 const [error, setError] = useState(
   searchParams.get("expired")
@@ -72,6 +74,13 @@ const [error, setError] = useState(
       );
 
       const data = await response.json();
+
+      // Signed up but hasn't opened the verification link yet
+      if (data.code === "EMAIL_NOT_VERIFIED") {
+        setPassword("");
+        setUnverifiedEmail(data.email || email.trim().toLowerCase());
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -186,6 +195,26 @@ setGoogleLoading(true);
   }
 
   const busy = loading || googleLoading;
+
+  if (unverifiedEmail) {
+    return (
+      <AuthLayout>
+        <CheckEmailNotice
+          email={unverifiedEmail}
+          message={
+            <>
+              Your account isn't verified yet. Open the link we sent to{" "}
+              <span className="font-semibold text-slate-700">
+                {unverifiedEmail}
+              </span>
+              , or get a new one below.
+            </>
+          }
+          onBack={() => setUnverifiedEmail("")}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

@@ -7,6 +7,9 @@ const {
   changePassword,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerification,
+  confirmEmailChange,
 } = require("../controllers/authController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -19,6 +22,8 @@ const {
 const {
   authLimiter,
   passwordResetLimiter,
+  registerLimiter,
+  emailLinkLimiter,
 } = require("../middleware/rateLimiter");
 
 const {
@@ -29,13 +34,37 @@ const router = express.Router();
 
 router.post(
   "/register",
-  authLimiter,
+  registerLimiter,
   validateBody({
     name: required(rules.name),
     email: required(rules.email),
     password: required(rules.password),
   }),
   registerUser
+);
+
+// Email verification (self sign-up)
+router.post(
+  "/verify-email/:token",
+  authLimiter,
+  validateBody({
+    password: required({ label: "Password", type: "string", max: 128 }),
+  }),
+  verifyEmail
+);
+
+router.post(
+  "/resend-verification",
+  emailLinkLimiter,
+  validateBody({ email: required(rules.email) }),
+  resendVerification
+);
+
+// Own-profile email change confirmation
+router.post(
+  "/confirm-email/:token",
+  emailLinkLimiter,
+  confirmEmailChange
 );
 
 router.post(

@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import VerifyEmail from "../pages/VerifyEmail";
+import ConfirmEmail from "../pages/ConfirmEmail";
 import Dashboard from "../pages/Dashboard";
 import TicketList from "../pages/TicketList";
 import CreateTicket from "../pages/CreateTicket";
@@ -32,6 +34,10 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
 
         <Route path="/register" element={<Register />} />
+
+        <Route path="/verify-email/:token" element={<VerifyEmail />} />
+
+        <Route path="/confirm-email/:token" element={<ConfirmEmail />} />
 
         {/* =========================
             AUTHENTICATED ROUTES
