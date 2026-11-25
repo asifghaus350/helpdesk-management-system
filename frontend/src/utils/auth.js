@@ -200,18 +200,13 @@ export const isUnassignedTicket = (ticket) =>
 export const isAssignedToUser = (ticket, user) => {
   if (!ticket || !user) return false;
 
-  if (ticket.engineerId) {
-    const assignedId =
-      ticket.engineerId._id || ticket.engineerId;
+  // By id only, matching the backend
+  if (!ticket.engineerId) return false;
 
-    return String(assignedId) === String(user.id || user._id);
-  }
+  const assignedId =
+    ticket.engineerId._id || ticket.engineerId;
 
-  return (
-    !!ticket.engineer &&
-    ticket.engineer.trim().toLowerCase() ===
-      (user.name || "").trim().toLowerCase()
-  );
+  return String(assignedId) === String(user.id || user._id);
 };
 
 // Admin: any ticket. Engineer: tickets assigned to them.

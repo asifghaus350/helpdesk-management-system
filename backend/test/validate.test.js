@@ -119,6 +119,20 @@ describe("validateBody: string", () => {
       "Password must be at least 6 characters."
     );
   });
+
+  it("without allowEmpty, a blank optional field is rejected (not saved and 500)", () => {
+    expectRejected(
+      run({ title: rules.title }, { title: "   " }),
+      "title",
+      "Title cannot be empty."
+    );
+    expectRejected(
+      run({ name: rules.name }, { name: "" }),
+      "name",
+      "Name cannot be empty."
+    );
+    expectPassed(run({ title: rules.title }, {}));
+  });
 });
 
 describe("validateBody: email", () => {

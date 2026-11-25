@@ -61,6 +61,17 @@ app.use(
 );
 app.use(express.json({ limit: "1mb" }));
 
+// Express 5 leaves req.body undefined when a request has no JSON
+// body. Controllers read fields from it, so default to {} and let
+// validation answer with a 400 instead of a crash (500).
+app.use((req, res, next) => {
+  if (req.body === undefined) {
+    req.body = {};
+  }
+
+  next();
+});
+
 // =========================
 // AUTH ROUTES
 // =========================

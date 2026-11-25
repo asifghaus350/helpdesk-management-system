@@ -8,23 +8,20 @@ const escapeRegex = (value) =>
 // =========================
 // IS ASSIGNED ENGINEER
 // =========================
-// Matches by engineerId. Tickets saved before engineerId
-// existed fall back to a case-insensitive name match.
+// Matches by engineerId only. (Matching old tickets by name let an
+// engineer rename themselves to reach someone else's ticket; the
+// startup backfill links or releases those tickets instead.)
 
 const isAssignedEngineer = (ticket, engineerUser) => {
-  if (ticket.engineerId) {
-    const assignedId =
-      ticket.engineerId._id || ticket.engineerId;
-
-    return (
-      assignedId.toString() === engineerUser._id.toString()
-    );
+  if (!ticket.engineerId) {
+    return false;
   }
 
+  const assignedId =
+    ticket.engineerId._id || ticket.engineerId;
+
   return (
-    !!ticket.engineer &&
-    ticket.engineer.trim().toLowerCase() ===
-      (engineerUser.name || "").trim().toLowerCase()
+    assignedId.toString() === engineerUser._id.toString()
   );
 };
 
@@ -40,13 +37,6 @@ const isUnassigned = (ticket) =>
 const engineerTicketFilter = (engineerUser) => ({
   $or: [
     { engineerId: engineerUser._id },
-    {
-      engineerId: null,
-      engineer: {
-        $regex: `^${escapeRegex(engineerUser.name.trim())}$`,
-        $options: "i",
-      },
-    },
     { engineerId: null, engineer: "" },
   ],
 });
@@ -63,7 +53,9 @@ const resolveEngineer = async (value) => {
     return { engineerId: null, engineer: "" };
   }
 
-  const query = mongoose.isValidObjectId(value)
+  // isObjectIdOrHexString, not isValidObjectId: the latter treats
+  // any 12-character name (e.g. "John Smith12") as an id
+  const query = mongoose.isObjectIdOrHexString(value)
     ? { _id: value }
     : {
         name: {
@@ -131,10 +123,21 @@ const checkTicketAccess = async (ticket, user) => {
   return false;
 };
 
+// True when the user still exists and is an active Engineer
+const isActiveEngineer = async (userId) =>
+  Boolean(
+    await User.exists({
+      _id: userId,
+      role: "Engineer",
+      status: "Active",
+    })
+  );
+
 module.exports = {
   checkTicketAccess,
   isAssignedEngineer,
   isUnassigned,
   engineerTicketFilter,
   resolveEngineer,
+  isActiveEngineer,
 };

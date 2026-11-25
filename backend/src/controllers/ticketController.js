@@ -14,6 +14,7 @@ const {
   isUnassigned,
   engineerTicketFilter,
   resolveEngineer,
+  isActiveEngineer,
 } = require("../utils/ticketAccess");
 const {
   parsePagination,
@@ -664,6 +665,23 @@ if (status !== undefined) {
       ticket.engineerId = loggedInEngineer._id;
     }
 
+    // Closed tickets keep the engineer who resolved them, even after
+    // that engineer is deleted, demoted or deactivated. Reopening one
+    // sends it back to the unassigned queue so someone can pick it up.
+    // (Also old closed tickets that only kept a name, no engineer id.)
+    const reopened =
+      oldStatus === "Closed" && ticket.status !== "Closed";
+
+    const engineerGone = ticket.engineerId
+      ? ticket.engineerId.toString() === oldEngineerId &&
+        !(await isActiveEngineer(ticket.engineerId))
+      : Boolean(ticket.engineer);
+
+    if (reopened && engineerGone) {
+      ticket.engineer = "";
+      ticket.engineerId = null;
+    }
+
     // =========================
     // SAVE TICKET
     // =========================
@@ -754,7 +772,13 @@ if (status !== undefined) {
 
     const ticketLink = `/tickets/${ticket.ticketId}`;
 
-    if (assignmentChanged && oldEngineerId) {
+    // Someone who is no longer an active engineer (demoted to User,
+    // say) shouldn't hear about tickets they can't open any more
+    if (
+      assignmentChanged &&
+      oldEngineerId &&
+      (await isActiveEngineer(oldEngineerId))
+    ) {
       await notify({
         recipients: [oldEngineerId],
         actor: req.user.id,
@@ -786,8 +810,14 @@ if (status !== undefined) {
       status !== undefined &&
       oldStatus !== ticket.status
     ) {
+      const engineerToNotify =
+        ticket.engineerId &&
+        (await isActiveEngineer(ticket.engineerId))
+          ? ticket.engineerId
+          : null;
+
       await notify({
-        recipients: [ticket.createdBy, ticket.engineerId],
+        recipients: [ticket.createdBy, engineerToNotify],
         actor: req.user.id,
         type: "ticket_status",
         title: `${ticket.ticketId} is now ${ticket.status}`,

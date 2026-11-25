@@ -116,8 +116,10 @@ const createComment = async (req, res) => {
       user: req.user.id,
       action: "Comment Added",
       message: `Comment added to ticket ${ticket.ticketId}`,
+      // The comment text isn't copied into the log: an edited or
+      // deleted comment must not stay readable there
       oldValue: "",
-      newValue: message.trim(),
+      newValue: "",
     });
 
     // Tell the reporter and the assigned engineer
@@ -217,9 +219,6 @@ const updateComment = async (req, res) => {
       });
     }
 
-    // Store old message
-    const oldMessage = comment.message;
-
     // Update comment
     comment.message = message.trim();
 
@@ -234,8 +233,8 @@ const updateComment = async (req, res) => {
       user: req.user.id,
       action: "Comment Updated",
       message: "Comment was updated",
-      oldValue: oldMessage,
-      newValue: message.trim(),
+      oldValue: "",
+      newValue: "",
     });
 
     // Get updated populated comment
@@ -310,7 +309,6 @@ const deleteComment = async (req, res) => {
 
     // Store values before deletion
     const ticketId = comment.ticket;
-    const deletedMessage = comment.message;
 
     // =========================
     // CREATE ACTIVITY
@@ -321,7 +319,7 @@ const deleteComment = async (req, res) => {
       user: req.user.id,
       action: "Comment Deleted",
       message: "Comment was deleted",
-      oldValue: deletedMessage,
+      oldValue: "",
       newValue: "",
     });
 
