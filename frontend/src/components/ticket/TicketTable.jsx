@@ -79,6 +79,8 @@ function TicketTable({
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   // Current page of tickets from the server
   const [tickets, setTickets] = useState([]);
@@ -202,6 +204,12 @@ function TicketTable({
   // =========================
 
   const handleDelete = async () => {
+    // A double click must not fire two delete requests.
+    if (deleting) return;
+
+    setDeleteError("");
+    setDeleting(true);
+
     try {
       const token = localStorage.getItem("token");
 
@@ -232,6 +240,7 @@ function TicketTable({
 
       setIsDeleteOpen(false);
       setSelectedTicket(null);
+      setDeleteError("");
 
       // Deleted the last row of a page: go back one page.
       // Otherwise reload the same page from the server.
@@ -243,10 +252,12 @@ function TicketTable({
     } catch (error) {
       console.error("Delete ticket error:", error);
 
-      setError(
-        error.message ||
-          "Unable to delete ticket."
+      // Keep the popup open and show the failure inside it.
+      setDeleteError(
+        error.message || "Unable to delete ticket."
       );
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -741,9 +752,13 @@ function TicketTable({
 
       <DeleteModal
         isOpen={isDeleteOpen}
+        busy={deleting}
+        error={deleteError}
         onClose={() => {
+          if (deleting) return;
           setIsDeleteOpen(false);
           setSelectedTicket(null);
+          setDeleteError("");
         }}
         onDelete={handleDelete}
       />

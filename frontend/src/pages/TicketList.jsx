@@ -76,7 +76,9 @@ function TicketList() {
       params.delete(key);
     }
 
-    setSearchParams(params);
+    // Replace instead of push: typing search text shouldn't add a
+    // browser history entry for every keystroke.
+    setSearchParams(params, { replace: true });
   };
 
   const filterSetters = {
@@ -96,7 +98,7 @@ function TicketList() {
     setStatus("");
     setPriority("");
     setCategory("");
-    setSearchParams(new URLSearchParams());
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
 
   const activeFilterCount = [

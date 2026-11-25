@@ -642,13 +642,31 @@ if (status !== undefined) {
       isAdmin &&
       engineer !== undefined
     ) {
-      const assignment = await resolveEngineer(engineer);
+      let assignment = engineer
+        ? await resolveEngineer(engineer)
+        : { engineerId: null, engineer: "" };
 
+      // A ticket can still point at an engineer who has since left.
+      // Re-saving that ticket must not fail: keep it unassigned instead.
       if (!assignment) {
-        return res.status(400).json({
-          success: false,
-          message: "Selected engineer was not found",
-        });
+        const currentId =
+          ticket.engineerId?._id || ticket.engineerId;
+
+        const sameEngineer =
+          Boolean(engineer) &&
+          (String(currentId || "") === String(engineer) ||
+            (ticket.engineer &&
+              ticket.engineer.toLowerCase() ===
+                String(engineer).trim().toLowerCase()));
+
+        if (!sameEngineer) {
+          return res.status(400).json({
+            success: false,
+            message: "Selected engineer was not found",
+          });
+        }
+
+        assignment = { engineerId: null, engineer: "" };
       }
 
       ticket.engineer = assignment.engineer;

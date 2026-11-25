@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Pencil,
@@ -12,17 +12,20 @@ import {
   LoaderCircle,
   SearchX,
   CheckCircle,
+  Trash2,
 } from "lucide-react";
 
 import Layout from "../components/layout/Layout";
 import TicketComments from "../components/ticket/TicketComments";
 import TicketActivity from "../components/ticket/TicketActivity";
 import TicketAttachments from "../components/ticket/TicketAttachments";
+import DeleteModal from "../components/ui/DeleteModal";
 
 import {
   getStoredUser,
   canEditTicket,
   canAssignToSelf,
+  canDeleteTicket,
 } from "../utils/auth";
 import { timeAgo, initials, formatDuration } from "../utils/format";
 import { API_URL } from "../config";
@@ -68,12 +71,17 @@ const formatDateTime = (date) =>
 
 function TicketDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState("");
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   // Bumped after comments / assignment so the activity
   // timeline reloads and shows the new entry.
@@ -135,14 +143,62 @@ function TicketDetails() {
   };
 
   // =========================
+  // DELETE TICKET (ADMIN)
+  // =========================
+
+  const handleDeleteTicket = async () => {
+    if (deleting) return;
+
+    setDeleteError("");
+    setDeleting(true);
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `${API_URL}/api/tickets/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to delete ticket"
+        );
+      }
+
+      setDeleteOpen(false);
+      navigate("/tickets", { replace: true });
+    } catch (error) {
+      setDeleteError(
+        error.message || "Unable to delete ticket."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // =========================
   // FETCH TICKET
   // =========================
 
   useEffect(() => {
+    // Cancel the previous request when the URL changes. Without this,
+    // a slow old response can paint the wrong ticket on the new page.
+    const controller = new AbortController();
+    let cancelled = false;
+
     const fetchTicket = async () => {
       try {
         setLoading(true);
         setError("");
+        setTicket(null);
 
         const token = localStorage.getItem("token");
 
@@ -160,10 +216,13 @@ function TicketDetails() {
             headers: {
               Authorization: `Bearer ${token}`,
             },
+            signal: controller.signal,
           }
         );
 
         const data = await response.json();
+
+        if (cancelled) return;
 
         if (!response.ok) {
           throw new Error(
@@ -173,6 +232,8 @@ function TicketDetails() {
 
         setTicket(data.ticket);
       } catch (error) {
+        if (cancelled || error.name === "AbortError") return;
+
         console.error(
           "Fetch ticket error:",
           error
@@ -183,11 +244,16 @@ function TicketDetails() {
             "Unable to load ticket."
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchTicket();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [id]);
 
   // =========================
@@ -453,6 +519,22 @@ function TicketDetails() {
               Edit Ticket
             </Link>
           )}
+
+          {/* Available here too, so Admins can delete from the ticket
+              page on phones where the table's icon can be missed. */}
+          {canDeleteTicket(currentUser) && (
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError("");
+                setDeleteOpen(true);
+              }}
+              className="inline-flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-50 transition"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
+          )}
         </div>
 
       </div>
@@ -493,6 +575,7 @@ function TicketDetails() {
           {/* ATTACHMENTS */}
 
           <TicketAttachments
+            key={`attachments-${ticket.ticketId}`}
             ticketId={ticket.ticketId}
             onChange={refreshActivity}
             refreshKey={activityKey}
@@ -501,6 +584,7 @@ function TicketDetails() {
           {/* CONVERSATION */}
 
           <TicketComments
+            key={`comments-${ticket.ticketId}`}
             ticketId={ticket.ticketId}
             onChange={refreshActivity}
           />
@@ -538,12 +622,25 @@ function TicketDetails() {
           {/* ACTIVITY */}
 
           <TicketActivity
+            key={`activity-${ticket.ticketId}`}
             ticketId={ticket.ticketId}
             refreshKey={activityKey}
           />
         </aside>
 
       </div>
+
+      <DeleteModal
+        isOpen={deleteOpen}
+        busy={deleting}
+        error={deleteError}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteOpen(false);
+          setDeleteError("");
+        }}
+        onDelete={handleDeleteTicket}
+      />
 
     </Layout>
   );

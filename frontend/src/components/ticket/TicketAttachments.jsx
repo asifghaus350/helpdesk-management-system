@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   Paperclip,
@@ -21,6 +21,7 @@ import {
   deleteAttachment,
   downloadAttachment,
   fetchAttachmentBlob,
+  openBlobInNewTab,
   validateFiles,
   formatBytes,
   isImage,
@@ -47,6 +48,12 @@ function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
   const [preview, setPreview] = useState(null); // { url, filename }
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+
+  // Cached blob URLs survive uploads / refreshKey changes, so images
+  // are downloaded once. They are revoked when a file is deleted or
+  // when this page unmounts.
+  const thumbnailCache = useRef(new Map());
+  const previewUrl = useRef(null);
 
   // =========================
   // LOAD LIST
@@ -87,28 +94,63 @@ function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
     if (!imageIds) return undefined;
 
     let cancelled = false;
-    const urls = {};
+    const ids = imageIds.split(",");
 
     const load = async () => {
-      for (const id of imageIds.split(",")) {
+      for (const id of ids) {
+        // Reuse the cached URL instead of downloading again.
+        if (thumbnailCache.current.has(id)) continue;
+
         try {
-          const blob = await fetchAttachmentBlob(id, { inline: true });
-          urls[id] = URL.createObjectURL(blob);
+          const blob = await fetchAttachmentBlob(id, {
+            inline: true,
+          });
+
+          if (cancelled) return;
+
+          thumbnailCache.current.set(
+            id,
+            URL.createObjectURL(blob)
+          );
         } catch {
           // Thumbnail is optional; the file icon is shown instead
         }
       }
 
-      if (!cancelled) setThumbnails({ ...urls });
+      if (cancelled) return;
+
+      const visible = {};
+
+      ids.forEach((id) => {
+        const url = thumbnailCache.current.get(id);
+        if (url) visible[id] = url;
+      });
+
+      setThumbnails(visible);
     };
 
     load();
 
     return () => {
       cancelled = true;
-      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
     };
   }, [imageIds]);
+
+  // Release object URLs when leaving the page
+  useEffect(
+    () => () => {
+      thumbnailCache.current.forEach((url) =>
+        URL.revokeObjectURL(url)
+      );
+      thumbnailCache.current.clear();
+
+      if (previewUrl.current) {
+        URL.revokeObjectURL(previewUrl.current);
+        previewUrl.current = null;
+      }
+    },
+    []
+  );
 
   // =========================
   // ACTIONS
@@ -141,16 +183,24 @@ function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
     try {
       setBusyId(attachment._id);
 
-      const blob = await fetchAttachmentBlob(attachment._id, {
-        inline: true,
-      });
-      const url = URL.createObjectURL(blob);
-
       if (isPdf(attachment.mimeType)) {
-        // Browsers have their own PDF viewer
-        window.open(url, "_blank", "noopener");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        // Open the tab synchronously (Safari-friendly), then load the
+        // file into it once the authenticated request completes.
+        await openBlobInNewTab(() =>
+          fetchAttachmentBlob(attachment._id, { inline: true })
+        );
       } else {
+        const blob = await fetchAttachmentBlob(attachment._id, {
+          inline: true,
+        });
+
+        // Release a previous preview before replacing it
+        if (previewUrl.current) {
+          URL.revokeObjectURL(previewUrl.current);
+        }
+
+        const url = URL.createObjectURL(blob);
+        previewUrl.current = url;
         setPreview({ url, filename: attachment.filename });
       }
     } catch (error) {
@@ -161,7 +211,11 @@ function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
   };
 
   const closePreview = () => {
-    if (preview) URL.revokeObjectURL(preview.url);
+    if (previewUrl.current) {
+      URL.revokeObjectURL(previewUrl.current);
+      previewUrl.current = null;
+    }
+
     setPreview(null);
   };
 
@@ -184,6 +238,14 @@ function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
       setAttachments((prev) =>
         prev.filter((item) => item._id !== attachment._id)
       );
+
+      const cached = thumbnailCache.current.get(attachment._id);
+
+      if (cached) {
+        URL.revokeObjectURL(cached);
+        thumbnailCache.current.delete(attachment._id);
+      }
+
       toast.success("File deleted");
       onChange?.();
     } catch (error) {
@@ -210,8 +272,7 @@ function TicketAttachments({ ticketId, onChange, refreshKey = 0 }) {
 
     const handleKey = (e) => {
       if (e.key === "Escape") {
-        URL.revokeObjectURL(preview.url);
-        setPreview(null);
+        closePreview();
       }
     };
 

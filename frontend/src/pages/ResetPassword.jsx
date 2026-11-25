@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import AuthLayout from "../components/auth/AuthLayout";
+import { clearSession } from "../utils/auth";
 import { API_URL } from "../config";
 
 const REDIRECT_SECONDS = 3;
@@ -108,6 +109,11 @@ const ResetPassword = () => {
           data.message || "Unable to reset password."
         );
       }
+
+      // A password reset invalidates all old tokens. If this browser
+      // was still logged in, its saved session must go too, otherwise
+      // the next page load shows a misleading "Session expired".
+      clearSession();
 
       setSecondsLeft(REDIRECT_SECONDS);
       setSuccess(

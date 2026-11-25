@@ -159,6 +159,14 @@ function Settings() {
     return DEFAULT_SETTINGS;
   });
 
+  // Refs keep the latest values even when two switches are toggled
+  // before React re-renders. confirmedRef is what the server has
+  // actually accepted, so a failed save only rolls back its own keys.
+  const settingsRef = useRef(settings);
+  const confirmedRef = useRef(settings);
+  const requestSeq = useRef(0);
+  const latestAttempt = useRef({});
+
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef(null);
 
@@ -181,7 +189,23 @@ function Settings() {
     const handleSettingsChange = () => {
       try {
         const saved = JSON.parse(localStorage.getItem("settings"));
-        if (saved) setSettings({ ...DEFAULT_SETTINGS, ...saved });
+
+        if (saved) {
+          const next = { ...DEFAULT_SETTINGS, ...saved };
+
+          // Our own optimistic update also fires this event. Ignore it
+          // so it isn't mistaken for a server-confirmed value.
+          if (
+            JSON.stringify(next) ===
+            JSON.stringify(settingsRef.current)
+          ) {
+            return;
+          }
+
+          settingsRef.current = next;
+          confirmedRef.current = next;
+          setSettings(next);
+        }
       } catch {
         // Ignore unreadable cache
       }
@@ -197,31 +221,60 @@ function Settings() {
   // SAVE (every change saves immediately)
   // =========================
 
-  const saveSettings = async (updatedSettings) => {
-    const previousSettings = settings;
+  // `changes` is a partial object: only those keys are saved, and only
+  // those keys are rolled back if the request fails. Other toggles that
+  // were changed at the same time keep their own result.
+  const saveSettings = async (changes) => {
+    const updatedSettings = {
+      ...settingsRef.current,
+      ...changes,
+    };
+    const changedKeys = Object.keys(changes);
+    const requestId = ++requestSeq.current;
+
+    changedKeys.forEach((key) => {
+      latestAttempt.current[key] = requestId;
+    });
 
     // Apply immediately, then save to the account
+    settingsRef.current = updatedSettings;
     setSettings(updatedSettings);
     applySettingsLocally(updatedSettings);
 
     try {
       await saveSettingsToServer(updatedSettings);
 
+      changedKeys.forEach((key) => {
+        // An older response must not overwrite a newer confirmed value
+        if (latestAttempt.current[key] === requestId) {
+          confirmedRef.current[key] = updatedSettings[key];
+        }
+      });
+
       // Brief "Saved" confirmation
       setShowSaved(true);
       clearTimeout(savedTimer.current);
       savedTimer.current = setTimeout(() => setShowSaved(false), 2000);
     } catch (error) {
-      // Roll back so the screen matches what is really saved
-      setSettings(previousSettings);
-      applySettingsLocally(previousSettings);
+      const rolledBack = { ...settingsRef.current };
+
+      changedKeys.forEach((key) => {
+        // Don't undo a newer toggle of the same setting
+        if (latestAttempt.current[key] === requestId) {
+          rolledBack[key] = confirmedRef.current[key];
+        }
+      });
+
+      settingsRef.current = rolledBack;
+      setSettings(rolledBack);
+      applySettingsLocally(rolledBack);
 
       toast.error(error.message || "Could not save settings");
     }
   };
 
   const updateSetting = (name, value) =>
-    saveSettings({ ...settings, [name]: value });
+    saveSettings({ [name]: value });
 
   const isDefault = Object.keys(DEFAULT_SETTINGS).every(
     (key) => settings[key] === DEFAULT_SETTINGS[key]
