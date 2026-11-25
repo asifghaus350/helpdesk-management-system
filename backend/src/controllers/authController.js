@@ -16,18 +16,20 @@ const registerUser = async (req, res) => {
   try {
     // Role is never taken from the public request —
     // admins change roles through /api/users.
-    const { name, email, password } = req.body;
+    // Field formats and lengths are checked by validateBody
+    // in authRoutes before this runs.
+    const name = req.body.name.trim();
+    const email = req.body.email.trim().toLowerCase();
+    const { password } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name) {
       return res.status(400).json({
         success: false,
-        message: "Name, email and password are required",
+        message: "Name is required",
       });
     }
 
-    const existingUser = await User.findOne({
-      email: email.toLowerCase(),
-    });
+    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).json({
@@ -40,10 +42,22 @@ const registerUser = async (req, res) => {
 
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email,
       password: hashedPassword,
       role: "User",
     });
+
+    // Sign the new user straight in
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
 
     const userResponse = {
       id: user._id,
@@ -51,11 +65,14 @@ const registerUser = async (req, res) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      isOwner: Boolean(user.isOwner),
+      preferences: user.preferences,
     };
 
     res.status(201).json({
       success: true,
       message: "User registered successfully",
+      token,
       user: userResponse,
     });
   } catch (error) {
