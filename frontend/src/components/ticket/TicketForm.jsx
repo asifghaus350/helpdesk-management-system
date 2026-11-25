@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { initials } from "../../utils/format";
+import { canEditTicket, getStoredUser } from "../../utils/auth";
 import toast from "react-hot-toast";
 import { API_URL } from "../../config";
 import AttachmentDropzone from "./AttachmentDropzone";
@@ -84,6 +85,10 @@ function TicketForm({ mode = "create" }) {
   );
 
   const [error, setError] = useState("");
+
+  // Edit pages are checked as soon as the ticket loads, so users
+  // without permission never see a form they can't save.
+  const [canEdit, setCanEdit] = useState(mode !== "edit");
 
   // Files chosen on the create form; uploaded right after the
   // ticket is created (the ticket id is needed first).
@@ -201,6 +206,11 @@ function TicketForm({ mode = "create" }) {
 
         const data = await response.json();
 
+        if (response.status === 403) {
+          navigate(`/tickets/${id}`, { replace: true });
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(
             data.message ||
@@ -210,6 +220,13 @@ function TicketForm({ mode = "create" }) {
 
         const ticket = data.ticket;
 
+        // Check permission on page load, not only on save.
+        if (!canEditTicket(ticket, getStoredUser())) {
+          navigate(`/tickets/${id}`, { replace: true });
+          return;
+        }
+
+        setCanEdit(true);
         setAssignedEngineerName(ticket.engineer || "");
 
         setFormData({
@@ -229,6 +246,9 @@ function TicketForm({ mode = "create" }) {
           "Fetch ticket error:",
           error
         );
+
+        // Show the error in the form instead of leaving an empty skeleton
+        setCanEdit(true);
 
         setError(
           error.message ||
@@ -281,14 +301,7 @@ function TicketForm({ mode = "create" }) {
       return;
     }
 
-    // Engineer assignment is required only for Admin
-    if (isAdmin && !formData.engineer) {
-      setError(
-        "Please assign an Engineer to this ticket."
-      );
-
-      return;
-    }
+    // Engineer assignment is optional — tickets can stay Unassigned.
 
     try {
       setLoading(true);
@@ -315,7 +328,7 @@ function TicketForm({ mode = "create" }) {
 
         // Only Admin can assign an engineer
         if (isAdmin) {
-          createBody.engineer = formData.engineer;
+          createBody.engineer = effectiveEngineer;
         }
 
         const response = await fetch(
@@ -383,7 +396,7 @@ function TicketForm({ mode = "create" }) {
 
         // Only Admin can assign/reassign engineer
         if (isAdmin) {
-          updateBody.engineer = formData.engineer;
+          updateBody.engineer = effectiveEngineer;
         }
 
         const response = await fetch(
@@ -502,12 +515,27 @@ function TicketForm({ mode = "create" }) {
   const showStatus =
     isAdmin || (mode === "edit" && isEngineer);
 
+  // A ticket can still reference an engineer who has left. That id is
+  // not in the dropdown, so treat it as Unassigned everywhere instead
+  // of submitting a stale id the backend would reject.
+  const effectiveEngineer =
+    isAdmin &&
+    formData.engineer &&
+    !engineers.some(
+      (engineer) =>
+        String(engineer._id || engineer.id) ===
+        String(formData.engineer)
+    )
+      ? ""
+      : formData.engineer;
+
   const selectedEngineerName =
     engineers.find(
       (engineer) =>
         String(engineer._id || engineer.id) ===
-        String(formData.engineer)
-    )?.name || assignedEngineerName;
+        String(effectiveEngineer)
+    )?.name ||
+    (effectiveEngineer ? assignedEngineerName : "");
 
   // Radio-style buttons write through the same handler
   const setField = (name, value) =>
@@ -526,7 +554,7 @@ function TicketForm({ mode = "create" }) {
   // LOADING EDIT TICKET
   // =========================
 
-  if (loadingTicket) {
+  if (loadingTicket || (mode === "edit" && !canEdit)) {
     return (
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 animate-pulse">
         <div className="xl:col-span-2 h-140 rounded-2xl bg-slate-200" />
@@ -852,7 +880,10 @@ function TicketForm({ mode = "create" }) {
                   htmlFor="ticket-engineer"
                   className={labelClass}
                 >
-                  Assign Engineer <span className="text-red-500">*</span>
+                  Assign Engineer
+                  <span className="text-slate-400 font-normal">
+                    {" "}(optional)
+                  </span>
                 </label>
 
                 <div className="relative">
@@ -864,7 +895,7 @@ function TicketForm({ mode = "create" }) {
                   <select
                     id="ticket-engineer"
                     name="engineer"
-                    value={formData.engineer}
+                    value={effectiveEngineer}
                     onChange={handleChange}
                     disabled={loadingEngineers}
                     className="w-full h-12 border border-slate-300 rounded-xl pl-11 pr-4 text-sm text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition"
@@ -872,7 +903,7 @@ function TicketForm({ mode = "create" }) {
                     <option value="">
                       {loadingEngineers
                         ? "Loading engineers..."
-                        : "Select an engineer"}
+                        : "Unassigned"}
                     </option>
 
                     {engineers.map((engineer) => (
@@ -891,18 +922,19 @@ function TicketForm({ mode = "create" }) {
 
                 {!loadingEngineers &&
                   engineers.length === 0 && (
-                    <p className="flex items-center gap-1.5 text-sm text-red-500 mt-2">
+                    <p className="flex items-center gap-1.5 text-sm text-slate-500 mt-2">
                       <CircleAlert size={15} />
-                      No active engineers available. Add one from User Management.
+                      No active engineers yet. The ticket will stay Unassigned
+                      until one is added from User Management.
                     </p>
                   )}
 
                 {mode === "edit" &&
-                  assignedEngineerName && (
+                  selectedEngineerName && (
                     <p className="text-sm text-slate-500 mt-2">
                       Currently assigned to{" "}
                       <span className="font-medium text-slate-700">
-                        {assignedEngineerName}
+                        {selectedEngineerName}
                       </span>
                     </p>
                   )}

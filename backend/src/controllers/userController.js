@@ -126,6 +126,15 @@ const USER_STATUSES = ["Active", "Inactive"];
 const SAFE_USER_FIELDS =
   "-password -resetPasswordToken -resetPasswordExpires";
 
+// Small flag for the Admin user list: true for self sign-ups that have
+// not opened their verification email yet. Computed here so the UI
+// doesn't have to guess from the raw emailVerified field.
+const withUnverified = (list) =>
+  list.map((user) => ({
+    ...(typeof user.toObject === "function" ? user.toObject() : user),
+    unverified: user.emailVerified === false,
+  }));
+
 // Optional query: ?page=&limit=&search=&role=&status=
 // Without ?page the full list is returned (engineer dropdown).
 const getUsers = async (req, res) => {
@@ -164,12 +173,13 @@ const getUsers = async (req, res) => {
     if (!pagination.paginate) {
       const users = await User.find(filter)
         .select(SAFE_USER_FIELDS)
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
 
       return res.status(200).json({
         success: true,
         count: users.length,
-        users,
+        users: withUnverified(users),
       });
     }
 
@@ -178,7 +188,8 @@ const getUsers = async (req, res) => {
         .select(SAFE_USER_FIELDS)
         .sort({ createdAt: -1 })
         .skip(pagination.skip)
-        .limit(pagination.limit),
+        .limit(pagination.limit)
+        .lean(),
 
       User.countDocuments(filter),
 
@@ -207,7 +218,7 @@ const getUsers = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: users.length,
-      users,
+      users: withUnverified(users),
       pagination: buildPagination(pagination, total),
       roleCounts: {
         all: Object.values(roleCounts).reduce((a, b) => a + b, 0),

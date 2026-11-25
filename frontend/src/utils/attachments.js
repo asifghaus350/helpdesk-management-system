@@ -149,3 +149,35 @@ export const downloadAttachment = async (attachment) => {
 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+// Safari (and some popup blockers) only allow window.open() during the
+// click itself. Open an empty tab first, then load the fetched file into
+// it, so the preview still works after the network request finishes.
+export const openBlobInNewTab = async (loadBlob) => {
+  const tab = window.open("", "_blank");
+
+  if (!tab) {
+    throw new Error(
+      "Your browser blocked the preview tab. Allow pop-ups for this site and try again."
+    );
+  }
+
+  try {
+    tab.opener = null;
+  } catch {
+    // Already restricted by the browser — that's fine.
+  }
+
+  try {
+    const blob = await loadBlob();
+    const url = URL.createObjectURL(blob);
+
+    tab.location.href = url;
+
+    // Let the tab load the blob before releasing the URL.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    tab.close();
+    throw error;
+  }
+};

@@ -20,6 +20,7 @@ import {
   uploadAttachments,
   downloadAttachment,
   fetchAttachmentBlob,
+  openBlobInNewTab,
   validateFiles,
   formatBytes,
   isImage,
@@ -49,6 +50,8 @@ function TicketComments({ ticketId, onChange }) {
   const [editingId, setEditingId] = useState(null);
   const [editMessage, setEditMessage] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -179,13 +182,10 @@ function TicketComments({ ticketId, onChange }) {
   const openCommentFile = async (attachment) => {
     try {
       if (isImage(attachment.mimeType) || isPdf(attachment.mimeType)) {
-        const blob = await fetchAttachmentBlob(attachment._id, {
-          inline: true,
-        });
-        const url = URL.createObjectURL(blob);
-
-        window.open(url, "_blank", "noopener");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        // Open the tab during the click so Safari doesn't block it
+        await openBlobInNewTab(() =>
+          fetchAttachmentBlob(attachment._id, { inline: true })
+        );
       } else {
         await downloadAttachment(attachment);
       }
@@ -407,6 +407,12 @@ function TicketComments({ ticketId, onChange }) {
   // Confirmation happens inline on the comment.
 
   const handleDeleteComment = async (id) => {
+    // Ignore a second click while this comment is being deleted.
+    if (deletingId) return;
+
+    setDeleteError("");
+    setDeletingId(id);
+
     try {
       setError("");
 
@@ -451,6 +457,7 @@ function TicketComments({ ticketId, onChange }) {
         return next;
       });
 
+      setConfirmDeleteId(null);
       onChange?.();
     } catch (error) {
       console.error(
@@ -458,12 +465,12 @@ function TicketComments({ ticketId, onChange }) {
         error
       );
 
-      setError(
-        error.message ||
-          "Unable to delete comment."
+      // Keep the confirmation open so the failure is visible there.
+      setDeleteError(
+        error.message || "Unable to delete comment."
       );
     } finally {
-      setConfirmDeleteId(null);
+      setDeletingId(null);
     }
   };
 
@@ -740,28 +747,46 @@ function TicketComments({ ticketId, onChange }) {
                     {/* Inline delete confirmation */}
 
                     {isConfirmingDelete && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                        <span className="text-sm text-red-700">
-                          Delete this comment?
-                        </span>
+                      <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-sm text-red-700">
+                            Delete this comment?
+                          </span>
 
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="px-3 py-1 rounded-md text-sm text-slate-600 hover:bg-white"
-                          >
-                            Cancel
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmDeleteId(null);
+                                setDeleteError("");
+                              }}
+                              disabled={deletingId === comment._id}
+                              className="px-3 py-1 rounded-md text-sm text-slate-600 hover:bg-white disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteComment(comment._id)}
-                            className="px-3 py-1 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700"
-                          >
-                            Delete
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(comment._id)}
+                              disabled={deletingId === comment._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed"
+                            >
+                              {deletingId === comment._id && (
+                                <LoaderCircle size={13} className="animate-spin" />
+                              )}
+                              {deletingId === comment._id
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </div>
                         </div>
+
+                        {deleteError && (
+                          <p className="mt-2 text-sm text-red-600">
+                            {deleteError}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>

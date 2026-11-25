@@ -8,6 +8,10 @@ export const clearSession = () => {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   localStorage.removeItem("userPhoto");
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("userChanged"));
+  }
 };
 
 // Merges fields into the stored user and tells the navbar /
@@ -255,4 +259,30 @@ export const installAuthInterceptor = () => {
 
     return response;
   };
+
+  // localStorage is shared by every tab, but React state is not.
+  // The "storage" event is how the other tabs hear about a logout,
+  // a login as a different user, or a settings change.
+  window.addEventListener("storage", (event) => {
+    if (event.key === "token") {
+      // Logged out (or logged in as someone else) in another tab.
+      window.dispatchEvent(new Event("userChanged"));
+
+      if (!event.newValue && event.oldValue) {
+        // localStorage is shared, so the token (and usually the user)
+        // is already gone here. Reload and let ProtectedRoute send
+        // protected pages to /login. Don't write to localStorage:
+        // a login in the other tab may already have saved new values.
+        window.location.reload();
+      }
+    }
+
+    if (event.key === "user") {
+      window.dispatchEvent(new Event("userChanged"));
+    }
+
+    if (event.key === "settings") {
+      window.dispatchEvent(new Event("settingsChanged"));
+    }
+  });
 };

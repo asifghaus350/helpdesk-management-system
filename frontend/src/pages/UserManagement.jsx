@@ -1043,6 +1043,17 @@ function UserManagement() {
                                   You
                                 </span>
                               )}
+
+                              {(user.unverified === true ||
+                                user.emailVerified === false) && (
+                                <span
+                                  title="This sign-up has not verified their email yet"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase"
+                                >
+                                  <Mail size={11} />
+                                  Unverified
+                                </span>
+                              )}
                             </p>
 
                             <p className="text-xs text-slate-500 truncate max-w-65">
@@ -1333,8 +1344,9 @@ function UserManagement() {
                     </div>
                   </div>
 
-                  {/* PASSWORD */}
+                  {/* PASSWORD — your own account uses Profile → Security */}
 
+                  {!editingSelf && (
                   <div className="sm:col-span-2">
                     <label htmlFor="user-password" className={labelClass}>
                       {editingUser ? "New Password" : "Password"}
@@ -1381,6 +1393,13 @@ function UserManagement() {
                       </p>
                     )}
                   </div>
+                  )}
+
+                  {editingSelf && (
+                    <p className="sm:col-span-2 text-xs text-slate-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                      Change your own password from Profile → Security.
+                    </p>
+                  )}
 
                   {/* PHONE */}
 

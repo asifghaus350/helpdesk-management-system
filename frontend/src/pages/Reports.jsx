@@ -424,8 +424,18 @@ function Reports() {
       "Updated At",
     ];
 
-    const escape = (value) =>
-      `"${String(value ?? "").replace(/"/g, '""')}"`;
+    // Excel runs cells that start with = + - @ as formulas. A leading
+    // apostrophe forces them to be treated as text. Hindi/Urdu text also
+    // needs the UTF-8 BOM below so Excel doesn't garble it.
+    const escape = (value) => {
+      let text = String(value ?? "");
+
+      if (/^[=+\-@]/.test(text)) {
+        text = `'${text}`;
+      }
+
+      return `"${text.replace(/"/g, '""')}"`;
+    };
 
     const rows = report.inRange.map((ticket) => [
       ticket.ticketId,
@@ -445,7 +455,7 @@ function Reports() {
       .join("\n");
 
     const url = URL.createObjectURL(
-      new Blob([csv], { type: "text/csv;charset=utf-8" })
+      new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })
     );
 
     const link = document.createElement("a");
