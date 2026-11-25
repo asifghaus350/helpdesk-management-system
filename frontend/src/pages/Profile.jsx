@@ -73,6 +73,15 @@ function Profile() {
     phone: "",
   });
 
+  // Changing email needs the current password, and the new
+  // address waits for confirmation from its inbox
+  const [emailPassword, setEmailPassword] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
+
+  const emailChanged =
+    profile.email.trim().toLowerCase() !==
+    savedInfo.email.trim().toLowerCase();
+
   // =========================
   // PASSWORD
   // =========================
@@ -184,6 +193,8 @@ function Profile() {
           email: currentUser.email || "",
           phone: currentUser.phone || "",
         });
+
+        setPendingEmail(currentUser.pendingEmail || "");
 
         // Keep Navbar user data synchronized.
         updateStoredUser(currentUser);
@@ -450,6 +461,14 @@ function Profile() {
   const handleSave = async (e) => {
     e.preventDefault();
 
+    if (emailChanged && !emailPassword) {
+      setProfileSuccess("");
+      setError(
+        "Enter your current password to change your email."
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       setError("");
@@ -480,6 +499,9 @@ function Profile() {
             name: profile.name,
             email: profile.email,
             phone: profile.phone,
+            ...(emailChanged
+              ? { currentPassword: emailPassword }
+              : {}),
           }),
         }
       );
@@ -494,6 +516,12 @@ function Profile() {
       }
 
       const updatedUser = data.user || {};
+
+      setEmailPassword("");
+
+      if (data.emailChangePending) {
+        setPendingEmail(updatedUser.pendingEmail || profile.email);
+      }
 
       setProfile((prev) => ({
         ...prev,
@@ -530,7 +558,7 @@ function Profile() {
       updateStoredUser(updatedUser);
 
       setProfileSuccess(
-        "Profile updated successfully."
+        data.message || "Profile updated successfully."
       );
     } catch (error) {
       console.error(
@@ -1273,6 +1301,50 @@ function Profile() {
                         className={inputClass}
                       />
                     </div>
+
+                    {pendingEmail && !emailChanged && (
+                      <p className="mt-1.5 text-xs text-amber-600">
+                        Waiting for confirmation of {pendingEmail}. Open
+                        the link we sent there to switch.
+                      </p>
+                    )}
+
+                    {emailChanged && (
+                      <div className="mt-3">
+                        <label
+                          htmlFor="profile-email-password"
+                          className="block text-xs font-semibold text-slate-700 mb-1.5"
+                        >
+                          Current password (needed to change email)
+                        </label>
+
+                        <div className="relative">
+                          <Lock
+                            size={17}
+                            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+
+                          <input
+                            id="profile-email-password"
+                            type="password"
+                            value={emailPassword}
+                            onChange={(e) =>
+                              setEmailPassword(e.target.value)
+                            }
+                            autoComplete="current-password"
+                            placeholder="Your current password"
+                            className={inputClass}
+                          />
+                        </div>
+
+                        <p className="mt-1.5 text-xs text-slate-500">
+                          We'll send a link to the new address. Your email
+                          changes only after you open it. Signed in with
+                          Google and never set a password? Use "Forgot
+                          password" on the login page first.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* PHONE */}

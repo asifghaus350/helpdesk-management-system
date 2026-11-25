@@ -81,6 +81,7 @@ router.put(
     name: rules.name,
     email: rules.email,
     phone: rules.phone,
+    currentPassword: { label: "Current password", type: "string", max: 128, allowEmpty: true },
   }),
   updateOwnProfile
 );

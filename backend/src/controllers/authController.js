@@ -6,11 +6,68 @@ const User = require("../models/User");
 
 const {
   sendPasswordResetEmail,
+  sendVerificationEmail,
+  sendEmailChangeEmail,
 } = require("../services/emailService");
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const frontendUrl = () =>
+  process.env.FRONTEND_URL || "http://localhost:5173";
+
+// Random link token: the raw value goes in the email,
+// only its SHA-256 hash is stored.
+const hashToken = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+const newLinkToken = () => {
+  const raw = crypto.randomBytes(32).toString("hex");
+  return { raw, hashed: hashToken(raw) };
+};
+
+const signToken = (user) =>
+  jwt.sign(
+    {
+      id: user._id,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "1d",
+    }
+  );
+
+const loginResponse = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  status: user.status,
+  isOwner: Boolean(user.isOwner),
+  preferences: user.preferences,
+});
+
+// Gives the unverified user a fresh link and emails it
+const startEmailVerification = async (user) => {
+  const { raw, hashed } = newLinkToken();
+
+  user.emailVerificationToken = hashed;
+  user.emailVerificationExpires = new Date(Date.now() + DAY_MS);
+  await user.save();
+
+  await sendVerificationEmail(
+    user.email,
+    user.name,
+    `${frontendUrl()}/verify-email/${raw}`
+  );
+};
 
 // =========================
 // REGISTER USER
 // =========================
+// The account stays unverified (no login) until the link sent to
+// the email is opened, so nobody can sign up with an address that
+// isn't theirs and later receive its owner's Google login.
 
 const registerUser = async (req, res) => {
   try {
@@ -29,9 +86,9 @@ const registerUser = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ email });
+    let user = await User.findOne({ email });
 
-    if (existingUser) {
+    if (user && user.emailVerified !== false) {
       return res.status(400).json({
         success: false,
         message: "User with this email already exists",
@@ -40,47 +97,236 @@ const registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: "User",
-    });
+    if (user) {
+      // Signed up before but never verified: the latest sign-up
+      // replaces it. Verifying still needs both the emailed link
+      // and this password.
+      user.name = name;
+      user.password = hashedPassword;
+    } else {
+      user = new User({
+        name,
+        email,
+        password: hashedPassword,
+        role: "User",
+        emailVerified: false,
+      });
+    }
 
-    // Sign the new user straight in
-    const token = jwt.sign(
-      {
-        id: user._id,
-        role: user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1d",
-      }
-    );
+    try {
+      await startEmailVerification(user);
+    } catch (emailError) {
+      console.error("Verification email error:", emailError.message);
 
-    const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      isOwner: Boolean(user.isOwner),
-      preferences: user.preferences,
-    };
+      return res.status(502).json({
+        success: false,
+        message:
+          "Your account was created, but we couldn't send the verification email. Please use \"Resend email\" in a few minutes.",
+        email,
+      });
+    }
 
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
-      token,
-      user: userResponse,
+      message: `We sent a verification link to ${email}. Open it to activate your account.`,
+      verificationRequired: true,
+      email,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
+
     console.error("Register error:", error.message);
 
     res.status(500).json({
       success: false,
       message: "Server error while registering user",
+    });
+  }
+};
+
+// =========================
+// VERIFY EMAIL
+// =========================
+// Needs the emailed link AND the sign-up password, so whoever
+// verifies both owns the inbox and chose the password.
+
+const verifyEmail = async (req, res) => {
+  try {
+    const user = await User.findOne({
+      emailVerificationToken: hashToken(req.params.token),
+      emailVerificationExpires: { $gt: new Date() },
+      emailVerified: false,
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This verification link is invalid or has expired. Sign in to get a new one.",
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      req.body.password,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "That isn't the password you signed up with. If you signed up more than once, use the password from your latest sign-up.",
+      });
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    if (user.status !== "Active") {
+      return res.status(403).json({
+        success: false,
+        message: "Your email is verified, but your account is inactive",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Email verified. Welcome to HelpDesk!",
+      token: signToken(user),
+      user: loginResponse(user),
+    });
+  } catch (error) {
+    console.error("Verify email error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error while verifying email",
+    });
+  }
+};
+
+// =========================
+// RESEND VERIFICATION EMAIL
+// =========================
+// Same answer whether or not the account exists.
+
+const resendVerification = async (req, res) => {
+  try {
+    const email = req.body.email.trim().toLowerCase();
+    const user = await User.findOne({ email, emailVerified: false });
+
+    if (user) {
+      try {
+        await startEmailVerification(user);
+      } catch (emailError) {
+        console.error("Verification email error:", emailError.message);
+
+        return res.status(502).json({
+          success: false,
+          message:
+            "We couldn't send the verification email. Please try again later.",
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        "If this email has an unverified account, we sent a new verification link.",
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error while sending verification email",
+    });
+  }
+};
+
+// =========================
+// REQUEST EMAIL CHANGE (own profile)
+// =========================
+// Called by updateOwnProfile. The new address is stored as pending
+// and only used after the link sent to it is opened.
+
+const requestEmailChange = async (user, newEmail) => {
+  const { raw, hashed } = newLinkToken();
+
+  user.pendingEmail = newEmail;
+  user.emailChangeToken = hashed;
+  user.emailChangeExpires = new Date(Date.now() + DAY_MS);
+  await user.save();
+
+  await sendEmailChangeEmail(
+    newEmail,
+    user.name,
+    `${frontendUrl()}/confirm-email/${raw}`
+  );
+};
+
+// =========================
+// CONFIRM EMAIL CHANGE
+// =========================
+
+const confirmEmailChange = async (req, res) => {
+  try {
+    const user = await User.findOne({
+      emailChangeToken: hashToken(req.params.token),
+      emailChangeExpires: { $gt: new Date() },
+    });
+
+    if (!user || !user.pendingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "This confirmation link is invalid or has expired.",
+      });
+    }
+
+    const takenBy = await User.findOne({
+      email: user.pendingEmail,
+      _id: { $ne: user._id },
+    });
+
+    if (takenBy) {
+      return res.status(400).json({
+        success: false,
+        message: "Another account already uses this email.",
+      });
+    }
+
+    user.email = user.pendingEmail;
+    user.emailVerified = true;
+    user.pendingEmail = "";
+    user.emailChangeToken = null;
+    user.emailChangeExpires = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Your email is now ${user.email}.`,
+      email: user.email,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Another account already uses this email.",
+      });
+    }
+
+    console.error("Confirm email change error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error while confirming email",
     });
   }
 };
@@ -123,6 +369,16 @@ const loginUser = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
+      });
+    }
+
+    if (user.emailVerified === false) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        message:
+          "Please verify your email first. Open the link we sent to your inbox.",
+        email: user.email,
       });
     }
 
@@ -199,6 +455,10 @@ const getMe = async (req, res) => {
         profilePhoto: user.profilePhoto,
         isOwner: Boolean(user.isOwner),
         preferences: user.preferences,
+        pendingEmail:
+          user.emailChangeExpires && user.emailChangeExpires > new Date()
+            ? user.pendingEmail
+            : "",
       },
     });
   } catch (error) {
@@ -524,6 +784,11 @@ const resetPassword = async (req, res) => {
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
 
+    // The reset link proved the inbox is theirs
+    user.emailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+
     await user.save();
 
     res.status(200).json({
@@ -555,4 +820,8 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerification,
+  requestEmailChange,
+  confirmEmailChange,
 };

@@ -10,12 +10,9 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Navigate, Link, useNavigate } from "react-router-dom";
-import {
-  clearSession,
-  updateStoredUser,
-  isTokenExpired,
-} from "../utils/auth";
+import { isTokenExpired } from "../utils/auth";
 import AuthLayout from "../components/auth/AuthLayout";
+import CheckEmailNotice from "../components/auth/CheckEmailNotice";
 import { API_URL } from "../config";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,6 +30,8 @@ function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Set after sign-up: the account waits for email verification
+  const [sent, setSent] = useState(null);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -76,18 +75,21 @@ function Register() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Registration failed. Please try again."
-        );
+      // 502: account created but the email couldn't be sent;
+      // the notice's "Resend email" button can retry.
+      if (response.ok || (response.status === 502 && data.email)) {
+        setPassword("");
+        setConfirmPassword("");
+        setSent({
+          email: data.email || email.trim().toLowerCase(),
+          message: response.ok ? "" : data.message,
+        });
+        return;
       }
 
-      // New accounts are signed in straight away
-      clearSession();
-      localStorage.setItem("token", data.token);
-      updateStoredUser(data.user);
-
-      navigate("/dashboard");
+      throw new Error(
+        data.message || "Registration failed. Please try again."
+      );
     } catch (error) {
       console.error("Register error:", error);
 
@@ -104,6 +106,18 @@ function Register() {
 
   if (existingToken && !isTokenExpired(existingToken)) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  if (sent) {
+    return (
+      <AuthLayout>
+        <CheckEmailNotice
+          email={sent.email}
+          message={sent.message}
+          onBack={() => navigate("/login")}
+        />
+      </AuthLayout>
+    );
   }
 
   return (
