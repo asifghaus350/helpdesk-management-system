@@ -8,7 +8,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
-const { EJSON } = require("bson");
+const { EJSON } = mongoose.mongo.BSON;
 
 const outDir = path.resolve(process.argv[2] || path.join(__dirname, "..", "db-backup"));
 

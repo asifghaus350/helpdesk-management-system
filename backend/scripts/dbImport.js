@@ -8,7 +8,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
-const { EJSON } = require("bson");
+const { EJSON } = mongoose.mongo.BSON;
 
 const args = process.argv.slice(2);
 const confirmed = args.includes("--yes");
