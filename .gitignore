@@ -24,3 +24,5 @@ Thumbs.db
 # IDE / editor files
 .vscode/
 .idea/
+# Local database backups (contain user data and password hashes)
+db-backup/
