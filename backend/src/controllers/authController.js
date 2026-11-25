@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
 const User = require("../models/User");
+const { notify, adminIds } = require("../services/notificationService");
 
 const {
   sendPasswordResetEmail,
@@ -188,6 +189,17 @@ const verifyEmail = async (req, res) => {
     user.emailVerificationToken = null;
     user.emailVerificationExpires = null;
     await user.save();
+
+    // Tell the admins once the account is real (verified), the same
+    // way they hear about accounts an admin creates
+    await notify({
+      recipients: await adminIds(),
+      actor: user._id,
+      type: "user_created",
+      title: `New sign-up: ${user.name}`,
+      message: `${user.role} · ${user.email}`,
+      link: "/users",
+    });
 
     if (user.status !== "Active") {
       return res.status(403).json({

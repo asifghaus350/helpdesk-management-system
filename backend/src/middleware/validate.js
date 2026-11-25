@@ -26,6 +26,11 @@ const checkField = (label, value, rule) => {
   if (missing) {
     if (rule.required) return `${label} is required.`;
     if (value === undefined || value === null) return "";
+
+    // Optional on updates, but if sent it can't be blank (the model
+    // requires it, so saving would fail with a 500). Rules with a
+    // minimum length report that below instead.
+    if (!rule.min) return `${label} cannot be empty.`;
   }
 
   switch (rule.type) {

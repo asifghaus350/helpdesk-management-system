@@ -283,6 +283,12 @@ const downloadAttachment = async (req, res) => {
         console.error("Attachment stream error:", error.message);
 
         if (!res.headersSent) {
+          // Drop the file's headers so the error goes out as JSON,
+          // not labelled as an image/PDF download
+          res.removeHeader("Content-Type");
+          res.removeHeader("Content-Length");
+          res.removeHeader("Content-Disposition");
+
           res.status(404).json({
             success: false,
             message: "File content is missing",

@@ -291,17 +291,26 @@ const createUser = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Check existing email
     const existingUser = await User.findOne({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
     });
 
-    if (existingUser) {
+    if (existingUser && existingUser.emailVerified !== false) {
       return res.status(400).json({
         success: false,
         message:
           "User with this email already exists",
       });
+    }
+
+    // A self sign-up that was never verified doesn't block the
+    // admin: nobody has proved they own that email, so the admin's
+    // account replaces it.
+    if (existingUser) {
+      await User.deleteOne({ _id: existingUser._id });
     }
 
     // Hash password
@@ -312,8 +321,8 @@ const createUser = async (req, res) => {
 
     // Create user
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: normalizedEmail,
       password: hashedPassword,
       role: role || "User",
       status: status || "Active",
@@ -349,6 +358,14 @@ const createUser = async (req, res) => {
       user: userResponse,
     });
   } catch (error) {
+    // Two requests creating the same email at once
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
+
     console.error("Create user error:", error.message);
 
     res.status(500).json({

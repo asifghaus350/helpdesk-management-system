@@ -129,8 +129,8 @@ describe("isAssignedToUser", () => {
     expect(isAssignedToUser(ticket, engineer)).toBe(false);
   });
 
-  it("matches the legacy name ignoring case and spaces", () => {
-    expect(isAssignedToUser(assignedByLegacyName, engineer)).toBe(true);
+  it("never matches by name alone (an engineer could rename to match)", () => {
+    expect(isAssignedToUser(assignedByLegacyName, engineer)).toBe(false);
     expect(isAssignedToUser(assignedByLegacyName, otherEngineer)).toBe(false);
   });
 
@@ -150,7 +150,7 @@ describe("canEditTicket", () => {
 
   it("lets the assigned Engineer edit", () => {
     expect(canEditTicket(assignedById, engineer)).toBe(true);
-    expect(canEditTicket(assignedByLegacyName, engineer)).toBe(true);
+    expect(canEditTicket(assignedByLegacyName, engineer)).toBe(false);
   });
 
   it("blocks other Engineers and unassigned tickets", () => {

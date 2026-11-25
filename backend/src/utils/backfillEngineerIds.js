@@ -13,7 +13,7 @@ const backfillEngineerIds = async () => {
     const tickets = await Ticket.find({
       engineerId: null,
       engineer: { $ne: "" },
-    }).select("engineer");
+    }).select("engineer status");
 
     if (tickets.length === 0) {
       return;
@@ -31,6 +31,7 @@ const backfillEngineerIds = async () => {
     );
 
     let linked = 0;
+    let released = 0;
 
     for (const ticket of tickets) {
       const engineer = byName.get(
@@ -47,12 +48,28 @@ const backfillEngineerIds = async () => {
         );
 
         linked += 1;
+      } else if (ticket.status !== "Closed") {
+        // No engineer has this name any more. Access is by id only,
+        // so nobody could work on it: send it back to the queue.
+        // (Closed tickets keep the name as history.)
+        await Ticket.updateOne(
+          { _id: ticket._id },
+          { engineer: "" }
+        );
+
+        released += 1;
       }
     }
 
     if (linked > 0) {
       console.log(
         `Linked ${linked} ticket(s) to engineer accounts`
+      );
+    }
+
+    if (released > 0) {
+      console.log(
+        `Moved ${released} ticket(s) of removed engineers to the unassigned queue`
       );
     }
   } catch (error) {
