@@ -396,7 +396,13 @@ setGoogleLoading(true);
       </form>
 
       <p className="mt-8 text-center text-sm text-slate-500">
-        Don't have an account? Ask your administrator to create one.
+        Don't have an account?{" "}
+        <Link
+          to="/register"
+          className="font-semibold text-blue-600 hover:text-blue-700 transition"
+        >
+          Create account
+        </Link>
       </p>
 
     </AuthLayout>

@@ -16,7 +16,13 @@ const registerUser = async (req, res) => {
   try {
     // Role is never taken from the public request —
     // admins change roles through /api/users.
-    const { name, email, password } = req.body;
+    const name =
+      typeof req.body.name === "string" ? req.body.name.trim() : "";
+    const email =
+      typeof req.body.email === "string"
+        ? req.body.email.trim().toLowerCase()
+        : "";
+    const { password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -25,9 +31,28 @@ const registerUser = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({
-      email: email.toLowerCase(),
-    });
+    if (name.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Name must be 100 characters or fewer",
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    if (typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).json({
@@ -40,7 +65,7 @@ const registerUser = async (req, res) => {
 
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email,
       password: hashedPassword,
       role: "User",
     });
@@ -53,9 +78,22 @@ const registerUser = async (req, res) => {
       status: user.status,
     };
 
+    // Sign the new user straight in
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
+
     res.status(201).json({
       success: true,
       message: "User registered successfully",
+      token,
       user: userResponse,
     });
   } catch (error) {
