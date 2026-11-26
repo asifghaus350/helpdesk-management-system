@@ -647,7 +647,9 @@ if (status !== undefined) {
         : { engineerId: null, engineer: "" };
 
       // A ticket can still point at an engineer who has since left.
-      // Re-saving that ticket must not fail: keep it unassigned instead.
+      // Re-saving it must not fail with "engineer not found".
+      let keepExistingAssignment = false;
+
       if (!assignment) {
         const currentId =
           ticket.engineerId?._id || ticket.engineerId;
@@ -666,11 +668,21 @@ if (status !== undefined) {
           });
         }
 
-        assignment = { engineerId: null, engineer: "" };
+        // Closed tickets keep the engineer who resolved them as audit
+        // history, even after that account is gone. Only a reopen
+        // sends the ticket back to the unassigned queue (handled below).
+        keepExistingAssignment =
+          oldStatus === "Closed" && ticket.status === "Closed";
+
+        if (!keepExistingAssignment) {
+          assignment = { engineerId: null, engineer: "" };
+        }
       }
 
-      ticket.engineer = assignment.engineer;
-      ticket.engineerId = assignment.engineerId;
+      if (!keepExistingAssignment) {
+        ticket.engineer = assignment.engineer;
+        ticket.engineerId = assignment.engineerId;
+      }
     }
 
     // Engineer picks up an unassigned ticket

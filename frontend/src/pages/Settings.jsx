@@ -242,7 +242,7 @@ function Settings() {
     applySettingsLocally(updatedSettings);
 
     try {
-      await saveSettingsToServer(updatedSettings);
+      await saveSettingsToServer(changes);
 
       changedKeys.forEach((key) => {
         // An older response must not overwrite a newer confirmed value
