@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { initials } from "../../utils/format";
-import { canEditTicket, getStoredUser } from "../../utils/auth";
+import { canOpenEditPage, getStoredUser } from "../../utils/auth";
 import toast from "react-hot-toast";
 import { API_URL } from "../../config";
 import AttachmentDropzone from "./AttachmentDropzone";
@@ -221,7 +221,7 @@ function TicketForm({ mode = "create" }) {
         const ticket = data.ticket;
 
         // Check permission on page load, not only on save.
-        if (!canEditTicket(ticket, getStoredUser())) {
+        if (!canOpenEditPage(ticket, getStoredUser())) {
           navigate(`/tickets/${id}`, { replace: true });
           return;
         }
@@ -515,13 +515,38 @@ function TicketForm({ mode = "create" }) {
   const showStatus =
     isAdmin || (mode === "edit" && isEngineer);
 
-  // A ticket can still reference an engineer who has left. That id is
-  // not in the dropdown, so treat it as Unassigned everywhere instead
-  // of submitting a stale id the backend would reject.
+  // A ticket can still reference an engineer who has left. Closed
+  // tickets keep that name as history (until reopened), so keep the
+  // value selectable instead of silently unassigning it.
+  const staleAssignedEngineer =
+    mode === "edit" &&
+    formData.engineer &&
+    assignedEngineerName &&
+    !engineers.some(
+      (engineer) =>
+        String(engineer._id || engineer.id) ===
+        String(formData.engineer)
+    )
+      ? {
+          _id: formData.engineer,
+          name: assignedEngineerName,
+          inactive: true,
+        }
+      : null;
+
+  const keepStaleEngineer =
+    staleAssignedEngineer && formData.status === "Closed";
+
+  const dropdownEngineers = keepStaleEngineer
+    ? [...engineers, staleAssignedEngineer]
+    : engineers;
+
+  // Any other stale id goes back to Unassigned, which the backend
+  // accepts and stores as a real unassignment.
   const effectiveEngineer =
     isAdmin &&
     formData.engineer &&
-    !engineers.some(
+    !dropdownEngineers.some(
       (engineer) =>
         String(engineer._id || engineer.id) ===
         String(formData.engineer)
@@ -530,7 +555,7 @@ function TicketForm({ mode = "create" }) {
       : formData.engineer;
 
   const selectedEngineerName =
-    engineers.find(
+    dropdownEngineers.find(
       (engineer) =>
         String(engineer._id || engineer.id) ===
         String(effectiveEngineer)
@@ -906,7 +931,7 @@ function TicketForm({ mode = "create" }) {
                         : "Unassigned"}
                     </option>
 
-                    {engineers.map((engineer) => (
+                    {dropdownEngineers.map((engineer) => (
                       <option
                         key={
                           engineer._id ||
@@ -915,6 +940,8 @@ function TicketForm({ mode = "create" }) {
                         value={engineer._id || engineer.id}
                       >
                         {engineer.name}
+                        {engineer.inactive &&
+                          " (no longer active)"}
                       </option>
                     ))}
                   </select>

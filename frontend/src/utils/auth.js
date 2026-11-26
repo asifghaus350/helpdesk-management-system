@@ -4,10 +4,20 @@ import { API_URL } from "../config";
 // SESSION HELPERS
 // =========================
 
-export const clearSession = () => {
+// Written only for a real logout / password change. Plain re-login
+// clears the same keys but must not kick other tabs off their pages.
+export const LOGOUT_SIGNAL_KEY = "hd_logout_signal";
+
+export const clearSession = ({ broadcast = true } = {}) => {
+  const hadToken = Boolean(localStorage.getItem("token"));
+
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   localStorage.removeItem("userPhoto");
+
+  if (broadcast && hadToken) {
+    localStorage.setItem(LOGOUT_SIGNAL_KEY, String(Date.now()));
+  }
 
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("userChanged"));
@@ -61,11 +71,13 @@ export const applySettingsLocally = (settings) => {
 };
 
 // Saves settings to the account. Returns the saved preferences.
-export const saveSettingsToServer = async (settings) => {
+// Only the keys passed in are sent. A failed toggle then leaves the
+// other switches untouched on the server too, not just on screen.
+export const saveSettingsToServer = async (changes) => {
   const body = {};
 
   SETTING_KEYS.forEach((key) => {
-    if (settings[key] !== undefined) body[key] = settings[key];
+    if (changes[key] !== undefined) body[key] = changes[key];
   });
 
   const response = await fetch(
@@ -218,6 +230,12 @@ export const canEditTicket = (ticket, user) =>
   user?.role === "Admin" ||
   (user?.role === "Engineer" && isAssignedToUser(ticket, user));
 
+// Gate for the Edit Ticket page. Called as soon as the ticket loads so
+// a User (or an Engineer with someone else's ticket) is sent back to
+// the ticket page before the form can be filled in and saved.
+export const canOpenEditPage = (ticket, user) =>
+  Boolean(ticket) && canEditTicket(ticket, user);
+
 export const canDeleteTicket = (user) =>
   user?.role === "Admin";
 
@@ -265,16 +283,14 @@ export const installAuthInterceptor = () => {
   // a login as a different user, or a settings change.
   window.addEventListener("storage", (event) => {
     if (event.key === "token") {
-      // Logged out (or logged in as someone else) in another tab.
+      // Another tab logged in, logged out or refreshed its token.
       window.dispatchEvent(new Event("userChanged"));
+    }
 
-      if (!event.newValue && event.oldValue) {
-        // localStorage is shared, so the token (and usually the user)
-        // is already gone here. Reload and let ProtectedRoute send
-        // protected pages to /login. Don't write to localStorage:
-        // a login in the other tab may already have saved new values.
-        window.location.reload();
-      }
+    if (event.key === LOGOUT_SIGNAL_KEY && event.newValue) {
+      // Real logout / password change: let ProtectedRoute send
+      // protected pages to /login after the reload.
+      window.location.reload();
     }
 
     if (event.key === "user") {
@@ -283,6 +299,18 @@ export const installAuthInterceptor = () => {
 
     if (event.key === "settings") {
       window.dispatchEvent(new Event("settingsChanged"));
+
+      // The dark class lives on <html>, outside React. Apply it here
+      // too, so a theme change in another tab is visible immediately.
+      try {
+        const saved = JSON.parse(event.newValue || "{}");
+        document.documentElement.classList.toggle(
+          "dark",
+          saved.theme === "dark"
+        );
+      } catch {
+        // Ignore unreadable settings
+      }
     }
   });
 };

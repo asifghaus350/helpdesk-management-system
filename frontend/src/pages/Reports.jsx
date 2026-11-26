@@ -28,6 +28,7 @@ import {
 import Layout from "../components/layout/Layout";
 import { initials, formatDuration } from "../utils/format";
 import { API_URL } from "../config";
+import { buildCsv, CSV_BOM } from "../utils/csv";
 
 // =========================
 // CHART COLORS
@@ -424,19 +425,6 @@ function Reports() {
       "Updated At",
     ];
 
-    // Excel runs cells that start with = + - @ as formulas. A leading
-    // apostrophe forces them to be treated as text. Hindi/Urdu text also
-    // needs the UTF-8 BOM below so Excel doesn't garble it.
-    const escape = (value) => {
-      let text = String(value ?? "");
-
-      if (/^[=+\-@]/.test(text)) {
-        text = `'${text}`;
-      }
-
-      return `"${text.replace(/"/g, '""')}"`;
-    };
-
     const rows = report.inRange.map((ticket) => [
       ticket.ticketId,
       ticket.title,
@@ -450,12 +438,10 @@ function Reports() {
       ticket.updatedAt,
     ]);
 
-    const csv = [header, ...rows]
-      .map((row) => row.map(escape).join(","))
-      .join("\n");
+    const csv = buildCsv(header, rows);
 
     const url = URL.createObjectURL(
-      new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })
+      new Blob([CSV_BOM, csv], { type: "text/csv;charset=utf-8" })
     );
 
     const link = document.createElement("a");

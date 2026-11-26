@@ -88,8 +88,9 @@ const [error, setError] = useState(
         );
       }
 
-      // Start from a clean session
-      clearSession();
+      // Start from a clean session, but don't broadcast a logout:
+      // a login in another tab should not reload this one.
+      clearSession({ broadcast: false });
 
       // Save JWT token
       localStorage.setItem("token", data.token);
@@ -157,8 +158,8 @@ setGoogleLoading(true);
       );
     }
 
-    // Start from a clean session
-    clearSession();
+    // Start from a clean session without logging other tabs out
+    clearSession({ broadcast: false });
 
     // Save HelpDesk JWT token
     localStorage.setItem(
